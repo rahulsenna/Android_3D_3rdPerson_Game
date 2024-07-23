@@ -1,0 +1,22 @@
+{
+    
+    // "C_Cpp.intelliSenseEngine": "disabled",
+    "cmake.cmakePath": "C:\\Android\\android-sdk\\cmake\\3.22.1\\bin\\cmake.exe",
+    "clangd.detectExtensionConflicts": false,
+    "cmake.configureOnOpen": true,
+    "cmake.generator": "Ninja",
+    "[cpp]": {
+        "editor.lineNumbers": "off",
+        // "editor.defaultFormatter": "ms-vscode.cpptools",
+    },
+    "C_Cpp.enhancedColorization": "enabled",
+    "C_Cpp.experimentalFeatures": "enabled",
+    // "C_Cpp.default.compileCommands": "${workspaceFolder}/../../../.cxx",
+    "C_Cpp.default.compileCommands": "C:\\Users\\agentofchaos\\Desktop\\Android_3D_3rdPerson_Game\\app\\.cxx\\tools\\debug\\arm64-v8a",
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.clang_format_path": "clang-format",
+    "C_Cpp.formatting": "vcFormat",
+    "C_Cpp.autocompleteAddParentheses": true,
+    "C_Cpp.configurationWarnings": "enabled",
+    "C_Cpp.errorSquiggles": "disabled",
+}

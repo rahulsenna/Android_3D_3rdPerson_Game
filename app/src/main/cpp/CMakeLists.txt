@@ -9,10 +9,16 @@ project("Android_3D_3rdPerson_Game")
 # one used for loading in your Kotlin/Java or AndroidManifest.txt files.
 add_library(game SHARED
         main.cpp
-)
-#include_directories("C:/Android/agdk-libraries-2023.3.0.0/include")
+        AndroidOut.cpp
+        Renderer.cpp
+        Shader.cpp
+        TextureAsset.cpp
+        Utility.cpp)
+
 # Searches for a package provided by the game activity dependency
 find_package(game-activity REQUIRED CONFIG)
+
+include_directories("includes")
 
 # Configure libraries CMake uses to link your target library.
 target_link_libraries(game
@@ -25,4 +31,5 @@ target_link_libraries(game
         GLESv3
         jnigraphics
         android
-        log)
+        log
+)

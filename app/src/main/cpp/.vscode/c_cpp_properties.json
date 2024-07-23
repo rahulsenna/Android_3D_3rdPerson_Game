@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Users/agentofchaos/Desktop/Android_3D_3rdPerson_Game/app/.cxx/Debug/3j4s6o3n/arm64-v8a",
+                "C:\\Users\\agentofchaos\\.gradle\\caches\\transforms-4\\b7583d6c62e204b069b53deb2406a5f1\\transformed\\games-activity-1.2.2\\prefab\\modules\\game-activity\\include"
+            ],
+            "defines": [
+
+            ],
+            // "windowsSdkVersion": "10.0.22621.0",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-arm64"
+        }
+    ],
+    "version": 4
+}
