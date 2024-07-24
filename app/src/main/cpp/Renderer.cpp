@@ -36,23 +36,6 @@ aout << std::endl;\
 //! Color for cornflower blue. Can be sent directly to glClearColor
 #define CORNFLOWER_BLUE 100 / 255.f, 149 / 255.f, 237 / 255.f, 1
 
-/*!
- * Half the height of the projection matrix. This gives you a renderable area of height 4 ranging
- * from -2 to 2
- */
-static constexpr float kProjectionHalfHeight = 2.f;
-
-/*!
- * The near plane distance for the projection matrix. Since this is an orthographic projection
- * matrix, it's convenient to have negative values for sorting (and avoiding z-fighting at 0).
- */
-static constexpr float kProjectionNearPlane = -1.f;
-
-/*!
- * The far plane distance for the projection matrix. Since this is an orthographic porjection
- * matrix, it's convenient to have the far plane equidistant from 0 as the near plane.
- */
-static constexpr float kProjectionFarPlane = 1.f;
 
 
 
@@ -73,6 +56,11 @@ Renderer::~Renderer() {
 }
 
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+glm::mat4 model = glm::mat4(1.0f);
 
 void Renderer::render() {
     // Check to see if the surface has changed size. This is _necessary_ to do every frame when
@@ -84,29 +72,39 @@ void Renderer::render() {
     // even if you change from the sample orthographic projection matrix as your aspect ratio has
     // likely changed.
     if (shaderNeedsNewProjectionMatrix_) {
-        // a placeholder projection matrix allocated on the stack. Column-major memory layout
-        float projectionMatrix[16] = {0};
 
-        // build an orthographic projection matrix for 2d rendering
-        Utility::buildOrthographicMatrix(
-                projectionMatrix,
-                kProjectionHalfHeight,
-                float(width_) / height_,
-                kProjectionNearPlane,
-                kProjectionFarPlane);
+        model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
-        // send the matrix to the shader
-        // Note: the shader must be active for this to work. Since we only have one shader for this
-        // demo, we can assume that it's active.
-        shader_->setProjectionMatrix(projectionMatrix);
+        glm::mat4 view = glm::mat4(1.0f);
+        // note that we're translating the scene in the reverse direction of where we want to move
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+
+        glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)width_/(float)height_, 0.1f, 100.0f);
+
+        glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, -0.5f, 1.f));
+
+
+        GLint projectionLoc = glGetUniformLocation(shader_->program_,"uProjection");
+        glUniformMatrix4fv(projectionLoc, 1, false, glm::value_ptr(proj));
+
+        GLint modelLoc = glGetUniformLocation(shader_->program_,"uModel");
+        glUniformMatrix4fv(modelLoc, 1, false, glm::value_ptr(model));
+
+        GLint viewLoc = glGetUniformLocation(shader_->program_,"uView");
+        glUniformMatrix4fv(viewLoc, 1, false, glm::value_ptr(view));
+
 
         // make sure the matrix isn't generated every frame
         shaderNeedsNewProjectionMatrix_ = false;
     }
+    model = glm::rotate(model,   glm::radians(1.0f), glm::vec3(0.5f, .5f, 0.5f));
+    GLint modelLoc = glGetUniformLocation(shader_->program_,"uModel");
+    glUniformMatrix4fv(modelLoc, 1, false, glm::value_ptr(model));
+
 
 
     // clear the color buffer
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Render all the models. There's no depth testing in this sample so they're accepted in the
     // order provided. But the sample EGL setup requests a 24 bit depth buffer so you could
@@ -135,7 +133,12 @@ std::string ReadShaderFile(AAssetManager *assetManager, const char* filename) {
     return fileContent;
 }
 
-void Renderer::initRenderer() {
+
+void Renderer::initRenderer()
+{
+
+    
+
     // Choose your render attributes
     constexpr EGLint attribs[] = {
             EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
@@ -212,7 +215,9 @@ void Renderer::initRenderer() {
     shader_ = std::unique_ptr<Shader>(
             Shader::loadShader(ReadShaderFile(assetManager,"shaders/mainVertex.glsl"),
                                ReadShaderFile(assetManager,"shaders/mainFragment.glsl"),
-                               "inPosition", "inUV", "uProjection"));
+                               "inPosition",
+                               "inUV",
+                               "uProjection"));
     assert(shader_);
 
     // Note: there's only one shader in this demo, so I'll activate it here. For a more complex game
@@ -224,6 +229,7 @@ void Renderer::initRenderer() {
 
     // enable alpha globally for now, you probably don't want to do this in a game
     glEnable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);  
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // get some demo models into memory
@@ -260,14 +266,53 @@ void Renderer::createModels() {
      * |   \ |
      * 3 --- 2
      */
-    std::vector<Vertex> vertices = {
-            Vertex(Vector3{1, 1, 0}, Vector2{0, 0}), // 0
-            Vertex(Vector3{-1, 1, 0}, Vector2{1, 0}), // 1
-            Vertex(Vector3{-1, -1, 0}, Vector2{1, 1}), // 2
-            Vertex(Vector3{1, -1, 0}, Vector2{0, 1}) // 3
-    };
+
+ std::vector<Vertex> vertices = {
+        Vertex(Vector3{ -0.5f, -0.5f, -0.5f, }, Vector2{ 0.0f, 0.0f }),
+        Vertex(Vector3{ 0.5f, -0.5f, -0.5f, }, Vector2{ 1.0f, 0.0f }),
+        Vertex(Vector3{0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
+        Vertex(Vector3{0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
+        Vertex(Vector3{-0.5f,  0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
+        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 0.0f}),
+
+        Vertex(Vector3{-0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
+        Vertex(Vector3{0.5f, -0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+        Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 1.0f}),
+        Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 1.0f}),
+        Vertex(Vector3{-0.5f,  0.5f,  0.5f,},Vector2{  0.0f, 1.0f}),
+        Vertex(Vector3{-0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
+
+        Vertex(Vector3{-0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+        Vertex(Vector3{-0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
+        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
+        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
+        Vertex(Vector3{-0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
+        Vertex(Vector3{-0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+
+         Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+         Vertex(Vector3{0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
+         Vertex(Vector3{0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
+         Vertex(Vector3{0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
+         Vertex(Vector3{0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
+         Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+
+        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
+         Vertex(Vector3{0.5f, -0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
+         Vertex(Vector3{0.5f, -0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+         Vertex(Vector3{0.5f, -0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+        Vertex(Vector3{-0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
+        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
+
+        Vertex(Vector3{-0.5f,  0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
+         Vertex(Vector3{0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
+         Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+         Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
+        Vertex(Vector3{-0.5f,  0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
+        Vertex(Vector3{-0.5f,  0.5f, -0.5f},  Vector2{0.0f, 1.0f})
+};
+    
     std::vector<Index> indices = {
-            0, 1, 2, 0, 2, 3
+            0, 1, 2, 3,4,5, 6,7,8  ,9,10,11,  12,13,14,  15,16,17,  18,19,20,  21,22,23, 24,25,26,  27,28,29, 30,31,32, 33,34,35
     };
 
     // loads an image and assigns it to the square.

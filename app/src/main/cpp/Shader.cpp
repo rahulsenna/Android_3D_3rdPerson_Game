@@ -3,6 +3,7 @@
 #include "AndroidOut.h"
 #include "Model.h"
 #include "Utility.h"
+#include <signal.h>
 
 Shader *Shader::loadShader(
         const std::string &vertexSource,
@@ -117,11 +118,24 @@ void Shader::activate() const {
 void Shader::deactivate() const {
     glUseProgram(0);
 }
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, -0.5f, 1.f));
+    // world space positions of our cubes
+    glm::vec3 cubePositions[] = {
+        glm::vec3( 0.0f,  0.0f,  0.0f),
+        glm::vec3( 2.0f,  5.0f, -15.0f),
+        glm::vec3(-1.5f, -2.2f, -2.5f),
+        glm::vec3(-3.8f, -2.0f, -12.3f),
+        glm::vec3( 2.4f, -0.4f, -3.5f),
+        glm::vec3(-1.7f,  3.0f, -7.5f),
+        glm::vec3( 1.3f, -2.0f, -2.5f),
+        glm::vec3( 1.5f,  2.0f, -2.5f),
+        glm::vec3( 1.5f,  0.2f, -1.5f),
+        glm::vec3(-1.3f,  1.0f, -1.5f)
+    };
 
 void Shader::drawModel(const Model &model) const {
     // The position attribute is 3 floats
@@ -146,18 +160,28 @@ void Shader::drawModel(const Model &model) const {
     );
     glEnableVertexAttribArray(uv_);
 
-    trans = glm::rotate(trans, glm::radians(1.0f), glm::vec3(0.0, 0.0, 1.0));
-    unsigned int transformLoc = glGetUniformLocation(program_, "transform");
-    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
-
-
 
     // Setup the texture
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, model.getTexture().getTextureID());
 
     // Draw as indexed triangles
-    glDrawElements(GL_TRIANGLES, model.getIndexCount(), GL_UNSIGNED_SHORT, model.getIndexData());
+    // glDrawElements(GL_TRIANGLES, model.getIndexCount(), GL_UNSIGNED_SHORT, model.getIndexData());
+    for (unsigned int i = 0; i < 6; i++)
+    {
+        // calculate the model matrix for each object and pass it to shader before drawing
+        glm::mat4 uModel = glm::mat4(1.0f);
+        uModel = glm::translate(uModel, cubePositions[i]);
+        float angle = 20.0f * i;
+        uModel = glm::rotate(uModel, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+
+        GLint modelLoc = glGetUniformLocation(program_,"uModel");
+        glUniformMatrix4fv(modelLoc, 1, false, glm::value_ptr(uModel));
+
+
+        glDrawElements(GL_TRIANGLES, model.getIndexCount(), GL_UNSIGNED_SHORT, model.getIndexData());
+     
+    }
 
     glDisableVertexAttribArray(uv_);
     glDisableVertexAttribArray(position_);

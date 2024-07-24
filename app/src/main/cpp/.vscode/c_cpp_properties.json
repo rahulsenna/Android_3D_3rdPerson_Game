@@ -1,16 +1,24 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "Android",
             "includePath": [
-                "${workspaceFolder}/**",
-                "C:/Users/agentofchaos/Desktop/Android_3D_3rdPerson_Game/app/.cxx/Debug/3j4s6o3n/arm64-v8a",
-                "C:\\Users\\agentofchaos\\.gradle\\caches\\transforms-4\\b7583d6c62e204b069b53deb2406a5f1\\transformed\\games-activity-1.2.2\\prefab\\modules\\game-activity\\include"
+                // "${workspaceFolder}",
+                // "${workspaceFolder}/includes",
+                // "C:\\Users\\agentofchaos\\.gradle\\caches\\transforms-4\\b7583d6c62e204b069b53deb2406a5f1\\transformed\\games-activity-1.2.2\\prefab\\modules\\game-activity\\include",
+                // "C:\\Users\\agentofchaos\\Desktop\\Android_3D_3rdPerson_Game\\app\\.cxx\\Debug\\3j4s6o3n\\arm64-v8a",
+                // "C:\\Android\\android-sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\sysroot\\usr\\include"
+                // ,
+                // "C:\\Android\\android-sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\sysroot\\usr\\include\\c++\\v1",
+                // "C:\\Android\\android-sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\sysroot\\usr\\include\\i686-linux-android",
+                // "C:\\Android\\android-sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\sysroot\\usr\\include\\aarch64-linux-android"
             ],
             "defines": [
 
             ],
-            // "windowsSdkVersion": "10.0.22621.0",
+            "windowsSdkVersion": "10.0.22621.0",
+            "compileCommands": "C:\\Users\\agentofchaos\\Desktop\\Android_3D_3rdPerson_Game\\app\\.cxx\\tools\\debug\\arm64-v8a\\compile_commands.json",
+
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "clang-arm64"

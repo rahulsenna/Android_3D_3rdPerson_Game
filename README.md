@@ -24,7 +24,7 @@ Before you begin, ensure you have met the following requirements:
 ## Project Structure
 
 ```
-AndroidOpenGLNDK/
+Android_3D_3rdPerson_Game/
 ├── app/
 │   ├── src/
 │   │   ├── main/

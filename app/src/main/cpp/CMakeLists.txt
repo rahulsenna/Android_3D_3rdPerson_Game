@@ -7,6 +7,8 @@ project("Android_3D_3rdPerson_Game")
 
 # Creates your game shared library. The name must be the same as the
 # one used for loading in your Kotlin/Java or AndroidManifest.txt files.
+
+
 add_library(game SHARED
         main.cpp
         AndroidOut.cpp
@@ -18,7 +20,10 @@ add_library(game SHARED
 # Searches for a package provided by the game activity dependency
 find_package(game-activity REQUIRED CONFIG)
 
-include_directories("includes")
+include_directories(
+        includes
+        libs/assimp-src/includes
+)
 
 # Configure libraries CMake uses to link your target library.
 target_link_libraries(game
@@ -32,4 +37,5 @@ target_link_libraries(game
         jnigraphics
         android
         log
+        assimp
 )

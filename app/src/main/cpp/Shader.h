@@ -63,6 +63,7 @@ public:
      */
     void setProjectionMatrix(float *projectionMatrix) const;
 
+    GLuint program_;
 private:
     /*!
      * Helper function to load a shader of a given type
@@ -89,7 +90,6 @@ private:
               uv_(uv),
               projectionMatrix_(projectionMatrix) {}
 
-    GLuint program_;
     GLint position_;
     GLint uv_;
     GLint projectionMatrix_;

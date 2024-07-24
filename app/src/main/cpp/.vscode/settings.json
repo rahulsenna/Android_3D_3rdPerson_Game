@@ -18,5 +18,14 @@
     "C_Cpp.formatting": "vcFormat",
     "C_Cpp.autocompleteAddParentheses": true,
     "C_Cpp.configurationWarnings": "enabled",
-    "C_Cpp.errorSquiggles": "disabled",
+    "C_Cpp.errorSquiggles": "enabledIfIncludesResolve",
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "*.ejs": "html",
+        "android_native_app_glue.c": "cpp",
+        "sstream": "cpp",
+        "istream": "cpp",
+        "ostream": "cpp",
+        "iosfwd": "cpp"
+    },
 }
