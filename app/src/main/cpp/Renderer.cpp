@@ -78,9 +78,9 @@ void Renderer::render()
     shader_.use();
 
     // view/projection transformations
-    glm::mat4 projection = glm::perspective(glm::radians((float)90), (float)width_ / (float)height_, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians((float)60), (float)width_ / (float)height_, 0.1f, 100.0f);
     glm::mat4 view = glm::mat4 (1.f);
-    view = glm::translate(view, glm::vec3(0.,-1.,-1.1));
+    view = glm::translate(view, glm::vec3(0.,-1.,-3));
     // view = glm::rotate(view, 20.f, glm::vec3(1,1,0));
 
     shader_.setMat4("projection", projection);
@@ -89,7 +89,7 @@ void Renderer::render()
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-    model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
+    model = glm::scale(model, glm::vec3(.01f, .01f, .01f));	// it's a bit too big for our scene, so scale it down
     shader_.setMat4("model", model);
     models_.front().Draw(shader_);
 
@@ -186,7 +186,7 @@ void Renderer::initRenderer()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     shader_ = Shader("shaders/model.vs", "shaders/model.fs");
-    Model ourModel("models/peasant_girl/untitled.gltf");
+    Model ourModel("models/sophie/model.fbx");
     models_.emplace_back(ourModel);
 }
 

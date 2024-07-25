@@ -139,16 +139,16 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
     // normal: texture_normalN
 
     // 1. diffuse maps
-    vector<std::shared_ptr<TextureAsset>> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
+    vector<std::shared_ptr<TextureAsset>> diffuseMaps = loadMaterialTextures(scene, material, aiTextureType_DIFFUSE, "texture_diffuse");
     textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
     // 2. specular maps
-    vector<std::shared_ptr<TextureAsset>> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
+    vector<std::shared_ptr<TextureAsset>> specularMaps = loadMaterialTextures(scene, material, aiTextureType_SPECULAR, "texture_specular");
     textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
     // 3. normal maps
-    std::vector<std::shared_ptr<TextureAsset>> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+    std::vector<std::shared_ptr<TextureAsset>> normalMaps = loadMaterialTextures(scene, material, aiTextureType_HEIGHT, "texture_normal");
     textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
     // 4. height maps
-    std::vector<std::shared_ptr<TextureAsset>> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height");
+    std::vector<std::shared_ptr<TextureAsset>> heightMaps = loadMaterialTextures(scene, material, aiTextureType_AMBIENT, "texture_height");
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
 
     // return a mesh object created from the extracted mesh data
@@ -158,7 +158,8 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
 // checks all material textures of a given type and loads the textures if they're not loaded yet.
 // the required info is returned as a Texture struct.
 vector<std::shared_ptr<TextureAsset>> 
-Model::loadMaterialTextures(aiMaterial* mat,
+Model::loadMaterialTextures(const aiScene *scene,
+                            aiMaterial* mat,
                             aiTextureType type,
                             string typeName
                             )
@@ -182,11 +183,19 @@ Model::loadMaterialTextures(aiMaterial* mat,
         }
         if (!skip)
         {   // if texture hasn't been loaded already, load it
+            shared_ptr<TextureAsset> texture;
+            if (auto embededText = scene->GetEmbeddedTexture(str.C_Str()))
+            { 
+            	texture = TextureAsset::loadAsset(embededText,assetPath, typeName);
+            }
+            else
+            {
+                texture = TextureAsset::loadAsset(g_AssetManager,assetPath, typeName);    
+            }
             
-
-            auto texture = TextureAsset::loadAsset(g_AssetManager,assetPath, typeName);
             textures.push_back(texture);
-            textures_loaded.push_back(texture);  // store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
+            textures_loaded.push_back(texture);  
+            // store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
         }
     }
     return textures;

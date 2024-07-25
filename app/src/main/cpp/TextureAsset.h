@@ -3,9 +3,12 @@
 
 #include <memory>
 #include <android/asset_manager.h>
+#include <android/imagedecoder.h>
 #include <GLES3/gl3.h>
 #include <string>
 #include <vector>
+#include "assimp/texture.h"
+
 
 class TextureAsset {
 public:
@@ -17,6 +20,12 @@ public:
      */
     static std::shared_ptr<TextureAsset>
     loadAsset(AAssetManager *assetManager, const std::string &assetPath, const std::string &assetType);
+
+    static std::shared_ptr<TextureAsset>
+    loadAsset(const aiTexture *embeddedTexture, const std::string &assetPath, const std::string &assetType);
+
+    static std::shared_ptr<TextureAsset>
+    loadAsset(AImageDecoder *pAndroidDecoder, const std::string &assetPath, const std::string &assetType);
 
     ~TextureAsset();
 

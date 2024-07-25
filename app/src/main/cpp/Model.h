@@ -45,5 +45,5 @@ private:
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.
     // the required info is returned as a Texture struct.
-    std::vector<std::shared_ptr<TextureAsset>> loadMaterialTextures(aiMaterial *mat, aiTextureType type, std::string typeName);
+    std::vector<std::shared_ptr<TextureAsset>> loadMaterialTextures(const aiScene *scene, aiMaterial *mat, aiTextureType type, std::string typeName);
 };
