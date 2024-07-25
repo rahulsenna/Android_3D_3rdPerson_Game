@@ -21,6 +21,7 @@ public:
             context_(EGL_NO_CONTEXT),
             width_(0),
             height_(0),
+            shader_(Shader()),
             shaderNeedsNewProjectionMatrix_(true) {
         initRenderer();
     }
@@ -68,8 +69,10 @@ private:
 
     bool shaderNeedsNewProjectionMatrix_;
 
-    std::unique_ptr<Shader> shader_;
+    Shader shader_;
     std::vector<Model> models_;
+
+
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H

@@ -4,7 +4,9 @@
 #include "Utility.h"
 
 std::shared_ptr<TextureAsset>
-TextureAsset::loadAsset(AAssetManager *assetManager, const std::string &assetPath) {
+TextureAsset::loadAsset(AAssetManager *assetManager, const std::string &assetPath, const std::string &assetType) {
+
+    aout << "assetPath: " << assetPath << std::endl;
     // Get the image from asset manager
     auto pAndroidRobotPng = AAssetManager_open(
             assetManager,
@@ -70,11 +72,11 @@ TextureAsset::loadAsset(AAssetManager *assetManager, const std::string &assetPat
     AAsset_close(pAndroidRobotPng);
 
     // Create a shared pointer so it can be cleaned up easily/automatically
-    return std::shared_ptr<TextureAsset>(new TextureAsset(textureId));
+    return std::shared_ptr<TextureAsset>(new TextureAsset(textureId, assetPath, assetType));
 }
 
 TextureAsset::~TextureAsset() {
     // return texture resources
-    glDeleteTextures(1, &textureID_);
-    textureID_ = 0;
+    glDeleteTextures(1, &id);
+    id = 0;
 }

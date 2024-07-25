@@ -1,66 +1,49 @@
-#ifndef ANDROIDGLINVESTIGATIONS_MODEL_H
-#define ANDROIDGLINVESTIGATIONS_MODEL_H
+#pragma once
 
-#include <vector>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <assimp/port/AndroidJNI/AndroidJNIIOSystem.h>
+
+
+#include "Mesh.h"
+
+#include "Shader.h"
 #include "TextureAsset.h"
 
-union Vector3 {
-    struct {
-        float x, y, z;
-    };
-    float idx[3];
-};
-
-union Vector2 {
-    struct {
-        float x, y;
-    };
-    struct {
-        float u, v;
-    };
-    float idx[2];
-};
-
-struct Vertex {
-    constexpr Vertex(const Vector3 &inPosition, const Vector2 &inUV) : position(inPosition),
-                                                                       uv(inUV) {}
-
-    Vector3 position;
-    Vector2 uv;
-};
-
-typedef uint16_t Index;
-
-class Model {
+class Model 
+{
 public:
-    inline Model(
-            std::vector<Vertex> vertices,
-            std::vector<Index> indices,
-            std::shared_ptr<TextureAsset> spTexture)
-            : vertices_(std::move(vertices)),
-              indices_(std::move(indices)),
-              spTexture_(std::move(spTexture)) {}
+    // model data 
+    std::vector<std::shared_ptr<TextureAsset>> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
+    std::vector<Mesh>    meshes;
+    std::string directory;
+    bool gammaCorrection;
 
-    inline const Vertex *getVertexData() const {
-        return vertices_.data();
+    // constructor, expects a filepath to a 3D model.
+    Model(std::string const &path, bool gamma = false) : gammaCorrection(gamma)
+    {
+        loadModel(path);
     }
 
-    inline const size_t getIndexCount() const {
-        return indices_.size();
-    }
-
-    inline const Index *getIndexData() const {
-        return indices_.data();
-    }
-
-    inline const TextureAsset &getTexture() const {
-        return *spTexture_;
-    }
-
+    // draws the model, and thus all its meshes
+    void Draw(Shader &shader);
+    
+    
 private:
-    std::vector<Vertex> vertices_;
-    std::vector<Index> indices_;
-    std::shared_ptr<TextureAsset> spTexture_;
-};
+    // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
+    void loadModel(std::string const &path);
 
-#endif //ANDROIDGLINVESTIGATIONS_MODEL_H
+    // processes a node in a recursive fashion. Processes each individual mesh located at the node and repeats this process on its children nodes (if any).
+    void processNode(aiNode *node, const aiScene *scene);
+
+    Mesh processMesh(aiMesh *mesh, const aiScene *scene);
+
+    // checks all material textures of a given type and loads the textures if they're not loaded yet.
+    // the required info is returned as a Texture struct.
+    std::vector<std::shared_ptr<TextureAsset>> loadMaterialTextures(aiMaterial *mat, aiTextureType type, std::string typeName);
+};

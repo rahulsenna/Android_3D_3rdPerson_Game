@@ -60,85 +60,50 @@ Renderer::~Renderer() {
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-glm::mat4 model = glm::mat4(1.0f);
 
-void Renderer::render() {
+void Renderer::render()
+{
     // Check to see if the surface has changed size. This is _necessary_ to do every frame when
     // using immersive mode as you'll get no other notification that your renderable area has
     // changed.
     updateRenderArea();
 
-    // When the renderable area changes, the projection matrix has to also be updated. This is true
-    // even if you change from the sample orthographic projection matrix as your aspect ratio has
-    // likely changed.
-    if (shaderNeedsNewProjectionMatrix_) {
-
-        model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-        glm::mat4 view = glm::mat4(1.0f);
-        // note that we're translating the scene in the reverse direction of where we want to move
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-
-        glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)width_/(float)height_, 0.1f, 100.0f);
-
-        glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, -0.5f, 1.f));
-
-
-        GLint projectionLoc = glGetUniformLocation(shader_->program_,"uProjection");
-        glUniformMatrix4fv(projectionLoc, 1, false, glm::value_ptr(proj));
-
-        GLint modelLoc = glGetUniformLocation(shader_->program_,"uModel");
-        glUniformMatrix4fv(modelLoc, 1, false, glm::value_ptr(model));
-
-        GLint viewLoc = glGetUniformLocation(shader_->program_,"uView");
-        glUniformMatrix4fv(viewLoc, 1, false, glm::value_ptr(view));
-
-
-        // make sure the matrix isn't generated every frame
-        shaderNeedsNewProjectionMatrix_ = false;
-    }
-    model = glm::rotate(model,   glm::radians(1.0f), glm::vec3(0.5f, .5f, 0.5f));
-    GLint modelLoc = glGetUniformLocation(shader_->program_,"uModel");
-    glUniformMatrix4fv(modelLoc, 1, false, glm::value_ptr(model));
 
 
 
     // clear the color buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Render all the models. There's no depth testing in this sample so they're accepted in the
-    // order provided. But the sample EGL setup requests a 24 bit depth buffer so you could
-    // configure it at the end of initRenderer
-    if (!models_.empty()) {
-        for (const auto &model: models_) {
-            shader_->drawModel(model);
-        }
-    }
+        // don't forget to enable shader before setting uniforms
+    shader_.use();
+
+    // view/projection transformations
+    glm::mat4 projection = glm::perspective(glm::radians((float)90), (float)width_ / (float)height_, 0.1f, 100.0f);
+    glm::mat4 view = glm::mat4 (1.f);
+    view = glm::translate(view, glm::vec3(0.,-1.,-1.1));
+    // view = glm::rotate(view, 20.f, glm::vec3(1,1,0));
+
+    shader_.setMat4("projection", projection);
+    shader_.setMat4("view", view);
+
+    // render the loaded model
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
+    model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
+    shader_.setMat4("model", model);
+    models_.front().Draw(shader_);
+
+
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
     assert(swapResult == EGL_TRUE);
 }
 
-std::string ReadShaderFile(AAssetManager *assetManager, const char* filename) {
-    AAsset* asset = AAssetManager_open(assetManager, filename, AASSET_MODE_BUFFER);
-    aout << "Reading: " << filename << std::endl;
-    assert(asset);
-    size_t fileLength = AAsset_getLength(asset);
-    std::string fileContent;
-    fileContent.resize(fileLength);
-
-    AAsset_read(asset, &fileContent[0], fileLength);
-    AAsset_close(asset);
-    return fileContent;
-}
 
 
 void Renderer::initRenderer()
 {
-
-    
-
     // Choose your render attributes
     constexpr EGLint attribs[] = {
             EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
@@ -210,30 +175,19 @@ void Renderer::initRenderer()
     PRINT_GL_STRING(GL_RENDERER);
     PRINT_GL_STRING(GL_VERSION);
     PRINT_GL_STRING_AS_LIST(GL_EXTENSIONS);
-    auto assetManager = app_->activity->assetManager;
 
-    shader_ = std::unique_ptr<Shader>(
-            Shader::loadShader(ReadShaderFile(assetManager,"shaders/mainVertex.glsl"),
-                               ReadShaderFile(assetManager,"shaders/mainFragment.glsl"),
-                               "inPosition",
-                               "inUV",
-                               "uProjection"));
-    assert(shader_);
-
-    // Note: there's only one shader in this demo, so I'll activate it here. For a more complex game
-    // you'll want to track the active shader and activate/deactivate it as necessary
-    shader_->activate();
 
     // setup any other gl related global states
     glClearColor(CORNFLOWER_BLUE);
 
     // enable alpha globally for now, you probably don't want to do this in a game
     glEnable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);  
+    glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // get some demo models into memory
-    createModels();
+    shader_ = Shader("shaders/model.vs", "shaders/model.fs");
+    Model ourModel("models/peasant_girl/untitled.gltf");
+    models_.emplace_back(ourModel);
 }
 
 void Renderer::updateRenderArea() {
@@ -253,78 +207,6 @@ void Renderer::updateRenderArea() {
     }
 }
 
-
-/**
- * @brief Create any demo models we want for this demo.
- */
-void Renderer::createModels() {
-    /*
-     * This is a square:
-     * 0 --- 1
-     * | \   |
-     * |  \  |
-     * |   \ |
-     * 3 --- 2
-     */
-
- std::vector<Vertex> vertices = {
-        Vertex(Vector3{ -0.5f, -0.5f, -0.5f, }, Vector2{ 0.0f, 0.0f }),
-        Vertex(Vector3{ 0.5f, -0.5f, -0.5f, }, Vector2{ 1.0f, 0.0f }),
-        Vertex(Vector3{0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
-        Vertex(Vector3{0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
-        Vertex(Vector3{-0.5f,  0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
-        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 0.0f}),
-
-        Vertex(Vector3{-0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
-        Vertex(Vector3{0.5f, -0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-        Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 1.0f}),
-        Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 1.0f}),
-        Vertex(Vector3{-0.5f,  0.5f,  0.5f,},Vector2{  0.0f, 1.0f}),
-        Vertex(Vector3{-0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
-
-        Vertex(Vector3{-0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-        Vertex(Vector3{-0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
-        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
-        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
-        Vertex(Vector3{-0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
-        Vertex(Vector3{-0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-
-         Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-         Vertex(Vector3{0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
-         Vertex(Vector3{0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
-         Vertex(Vector3{0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
-         Vertex(Vector3{0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
-         Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-
-        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
-         Vertex(Vector3{0.5f, -0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
-         Vertex(Vector3{0.5f, -0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-         Vertex(Vector3{0.5f, -0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-        Vertex(Vector3{-0.5f, -0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
-        Vertex(Vector3{-0.5f, -0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
-
-        Vertex(Vector3{-0.5f,  0.5f, -0.5f,},Vector2{  0.0f, 1.0f}),
-         Vertex(Vector3{0.5f,  0.5f, -0.5f,},Vector2{  1.0f, 1.0f}),
-         Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-         Vertex(Vector3{0.5f,  0.5f,  0.5f,},Vector2{  1.0f, 0.0f}),
-        Vertex(Vector3{-0.5f,  0.5f,  0.5f,},Vector2{  0.0f, 0.0f}),
-        Vertex(Vector3{-0.5f,  0.5f, -0.5f},  Vector2{0.0f, 1.0f})
-};
-    
-    std::vector<Index> indices = {
-            0, 1, 2, 3,4,5, 6,7,8  ,9,10,11,  12,13,14,  15,16,17,  18,19,20,  21,22,23, 24,25,26,  27,28,29, 30,31,32, 33,34,35
-    };
-
-    // loads an image and assigns it to the square.
-    //
-    // Note: there is no texture management in this sample, so if you reuse an image be careful not
-    // to load it repeatedly. Since you get a shared_ptr you can safely reuse it in many models.
-    auto assetManager = app_->activity->assetManager;
-    auto spAndroidRobotTexture = TextureAsset::loadAsset(assetManager, "wall.jpg");
-
-    // Create a model and put it in the back of the render list.
-    models_.emplace_back(vertices, indices, spAndroidRobotTexture);
-}
 
 void Renderer::handleInput() {
     // handle all queued inputs

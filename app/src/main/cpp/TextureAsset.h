@@ -16,19 +16,22 @@ public:
      * @return a shared pointer to a texture asset, resources will be reclaimed when it's cleaned up
      */
     static std::shared_ptr<TextureAsset>
-    loadAsset(AAssetManager *assetManager, const std::string &assetPath);
+    loadAsset(AAssetManager *assetManager, const std::string &assetPath, const std::string &assetType);
 
     ~TextureAsset();
 
     /*!
      * @return the texture id for use with OpenGL
      */
-    constexpr GLuint getTextureID() const { return textureID_; }
+    constexpr GLuint getTextureID() const { return id; }
+    GLuint id;
+    std::string type;
+    std::string path;
 
 private:
-    inline TextureAsset(GLuint textureId) : textureID_(textureId) {}
+    inline TextureAsset(GLuint textureId, const std::string &assetPath, const std::string &assetType) : 
+    id(textureId), path(assetPath), type(assetType) {}
 
-    GLuint textureID_;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_TEXTUREASSET_H
