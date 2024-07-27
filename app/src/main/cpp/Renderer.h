@@ -6,6 +6,7 @@
 
 #include "Model.h"
 #include "Shader.h"
+#include "Animator.h"
 
 struct android_app;
 
@@ -22,6 +23,7 @@ public:
             width_(0),
             height_(0),
             shader_(Shader()),
+            animator(0),
             shaderNeedsNewProjectionMatrix_(true) {
         initRenderer();
     }
@@ -71,6 +73,7 @@ private:
 
     Shader shader_;
     std::vector<Model> models_;
+    Animator animator;
 
 
 };

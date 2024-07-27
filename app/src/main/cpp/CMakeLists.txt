@@ -27,6 +27,8 @@ add_library(game SHARED
         Renderer.cpp
         Shader.cpp
         TextureAsset.cpp
+        Animation.cpp
+        Animator.cpp
         Utility.cpp)
 
 # Searches for a package provided by the game activity dependency

@@ -10,6 +10,8 @@
 #include "Shader.h"
 #include "Utility.h"
 #include "TextureAsset.h"
+#include "Animation.h"
+#include "Animator.h"
 
 //! executes glGetString and outputs the result to logcat
 #define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
@@ -59,7 +61,9 @@ Renderer::~Renderer() {
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
+float deltaTime = 0.0f;
+auto lastFrameTime =  std::chrono::high_resolution_clock::now();
+#include <chrono>
 
 void Renderer::render()
 {
@@ -67,7 +71,12 @@ void Renderer::render()
     // using immersive mode as you'll get no other notification that your renderable area has
     // changed.
     updateRenderArea();
+    auto currentFrameTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> duration = currentFrameTime - lastFrameTime;
+    deltaTime = duration.count();
+    lastFrameTime = currentFrameTime;
 
+    animator.UpdateAnimation(deltaTime);
 
 
 
@@ -86,10 +95,13 @@ void Renderer::render()
     shader_.setMat4("projection", projection);
     shader_.setMat4("view", view);
 
+	for (int i = 0; i < animator.m_FinalBoneMatrices.size(); ++i)
+		shader_.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", animator.m_FinalBoneMatrices[i]);
+
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-    model = glm::scale(model, glm::vec3(.01f, .01f, .01f));	// it's a bit too big for our scene, so scale it down
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -4.0f)); // translate it down so it's at the center of the scene
+    model = glm::scale(model, glm::vec3(.1f, .1f, .1f));	// it's a bit too big for our scene, so scale it down
     shader_.setMat4("model", model);
     models_.front().Draw(shader_);
 
@@ -186,7 +198,10 @@ void Renderer::initRenderer()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     shader_ = Shader("shaders/model.vs", "shaders/model.fs");
-    Model ourModel("models/sophie/model.fbx");
+    Model ourModel("models/lady/model.fbx");
+    auto jogAnimation = new Animation("models/lady/model.fbx",&ourModel);
+    animator = Animator(jogAnimation);
+
     models_.emplace_back(ourModel);
 }
 

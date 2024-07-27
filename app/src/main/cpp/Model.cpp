@@ -3,8 +3,6 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
-#include <map>
-#include <vector>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -12,8 +10,7 @@
 
 #include "Model.h"
 #include "AndroidOut.h"
-
-using namespace std;
+#include "assimp_glm_helpers.h"
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
 
@@ -82,12 +79,16 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
     for (unsigned int i = 0; i < mesh->mNumVertices; i++)
     {
         Vertex vertex;
+        SetVertexBoneDataToDefault(vertex);
+        vertex.Position = AssimpGLMHelpers::GetGLMVec(mesh->mVertices[i]);
+        vertex.Normal = AssimpGLMHelpers::GetGLMVec(mesh->mNormals[i]);
         glm::vec3 vector; // we declare a placeholder vector since assimp uses its own vector class that doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
         // positions
-        vector.x = mesh->mVertices[i].x;
-        vector.y = mesh->mVertices[i].y;
-        vector.z = mesh->mVertices[i].z;
-        vertex.Position = vector;
+        // vector.x = mesh->mVertices[i].x;
+        // vector.y = mesh->mVertices[i].y;
+        // vector.z = mesh->mVertices[i].z;
+        // vertex.Position = vector;
+
         // normals
         if (mesh->HasNormals())
         {
@@ -151,8 +152,57 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
     std::vector<std::shared_ptr<TextureAsset>> heightMaps = loadMaterialTextures(scene, material, aiTextureType_AMBIENT, "texture_height");
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
 
+    ExtractBoneWeightForVertices(vertices, mesh, scene);
     // return a mesh object created from the extracted mesh data
     return Mesh(vertices, indices, textures);
+}
+void 
+Model::SetVertexBoneData(Vertex& vertex, int boneID, float weight)
+{
+    for (int i = 0; i < MAX_BONE_INFLUENCE; ++i)
+    {
+        if (vertex.m_BoneIDs[i] < 0)
+        {
+            vertex.m_Weights[i] = weight;
+            vertex.m_BoneIDs[i] = boneID;
+            break;
+        }
+    }
+}
+
+void 
+Model::ExtractBoneWeightForVertices(std::vector<Vertex>& vertices, aiMesh* mesh, const aiScene* scene)
+{
+    for (int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
+    {
+        int boneID = -1;
+        std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
+        if (m_BoneInfoMap.find(boneName) == m_BoneInfoMap.end())
+        {
+            BoneInfo newBoneInfo;
+            newBoneInfo.id = m_BoneCounter;
+            newBoneInfo.offset = AssimpGLMHelpers::ConvertMatrixToGLMFormat(
+                mesh->mBones[boneIndex]->mOffsetMatrix);
+            m_BoneInfoMap[boneName] = newBoneInfo;
+            boneID = m_BoneCounter;
+            m_BoneCounter++;
+        }
+        else
+        {
+            boneID = m_BoneInfoMap[boneName].id;
+        }
+        assert(boneID != -1);
+        auto weights = mesh->mBones[boneIndex]->mWeights;
+        int numWeights = mesh->mBones[boneIndex]->mNumWeights;
+
+        for (int weightIndex = 0; weightIndex < numWeights; ++weightIndex)
+        {
+            int vertexId = weights[weightIndex].mVertexId;
+            float weight = weights[weightIndex].mWeight;
+            assert(vertexId <= vertices.size());
+            SetVertexBoneData(vertices[vertexId], boneID, weight);
+        }
+    }
 }
 
 // checks all material textures of a given type and loads the textures if they're not loaded yet.

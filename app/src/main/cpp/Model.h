@@ -14,10 +14,30 @@
 
 #include "Shader.h"
 #include "TextureAsset.h"
+#include <vector>
+#include <map>
+
+#include "BoneInfo.h"
 
 class Model 
 {
 public:
+    std::map<string, BoneInfo> m_BoneInfoMap; //
+    int m_BoneCounter = 0;
+
+    auto& GetBoneInfoMap() { return m_BoneInfoMap; }
+    int& GetBoneCount() { return m_BoneCounter; }    
+
+    void SetVertexBoneDataToDefault(Vertex& vertex)
+    {
+        for (int i = 0; i < MAX_BONE_INFLUENCE; i++)
+        {
+            vertex.m_BoneIDs[i] = -1;
+            vertex.m_Weights[i] = 0.0f;
+        }
+    }
+    void SetVertexBoneData(Vertex& vertex, int boneID, float weight);
+    void ExtractBoneWeightForVertices(std::vector<Vertex>& vertices, aiMesh* mesh, const aiScene* scene);
     // model data 
     std::vector<std::shared_ptr<TextureAsset>> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
     std::vector<Mesh>    meshes;
