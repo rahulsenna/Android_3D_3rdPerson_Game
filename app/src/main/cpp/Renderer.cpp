@@ -76,7 +76,7 @@ void Renderer::render()
     deltaTime = duration.count();
     lastFrameTime = currentFrameTime;
 
-    animator.UpdateAnimation(deltaTime);
+    animator_.UpdateAnimation(deltaTime);
 
 
 
@@ -88,15 +88,19 @@ void Renderer::render()
 
     // view/projection transformations
     glm::mat4 projection = glm::perspective(glm::radians((float)60), (float)width_ / (float)height_, 0.1f, 100.0f);
-    glm::mat4 view = glm::mat4 (1.f);
-    view = glm::translate(view, glm::vec3(0.,-1.,-3));
+
+    
+    
     // view = glm::rotate(view, 20.f, glm::vec3(1,1,0));
 
     shader_.setMat4("projection", projection);
+    
+    // camera/view transformation
+    glm::mat4 view = camera_.GetViewMatrix();
     shader_.setMat4("view", view);
 
-	for (int i = 0; i < animator.m_FinalBoneMatrices.size(); ++i)
-		shader_.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", animator.m_FinalBoneMatrices[i]);
+	for (int i = 0; i < animator_.m_FinalBoneMatrices.size(); ++i)
+		shader_.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", animator_.m_FinalBoneMatrices[i]);
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
@@ -199,8 +203,8 @@ void Renderer::initRenderer()
 
     shader_ = Shader("shaders/model.vs", "shaders/model.fs");
     Model ourModel("models/sophie/model.dae");
-    auto jogAnimation = new Animation("models/sophie/jogging.dae",&ourModel);
-    animator = Animator(jogAnimation);
+    auto jogAnimation = new Animation("models/sophie/anim/Idle.dae",&ourModel);
+    animator_ = Animator(jogAnimation);
 
     models_.emplace_back(ourModel);
 }
@@ -219,79 +223,141 @@ void Renderer::updateRenderArea() {
 
         // make sure that we lazily recreate the projection matrix before we render
         shaderNeedsNewProjectionMatrix_ = true;
+        lastX_ = width_ / 2.0f;
+        lastY_ = height_ / 2.0f;
+        firstMouse_ = true;
     }
 }
 
+bool MoveForward = false;
 
-void Renderer::handleInput() {
+void Renderer::handleInput()
+{
+    if (MoveForward)
+    {
+        camera_.ProcessKeyboard(FORWARD, deltaTime);
+    }
+
     // handle all queued inputs
     auto *inputBuffer = android_app_swap_input_buffers(app_);
-    if (!inputBuffer) {
+    if (!inputBuffer)
+    {
         // no inputs yet.
         return;
     }
+    int32_t rightPointerID = -1;
 
     // handle motion events (motionEventsCounts can be 0).
-    for (auto i = 0; i < inputBuffer->motionEventsCount; i++) {
+    for (auto i = 0; i < inputBuffer->motionEventsCount; i++)
+    {
         auto &motionEvent = inputBuffer->motionEvents[i];
         auto action = motionEvent.action;
 
         // Find the pointer index, mask and bitshift to turn it into a readable value.
-        auto pointerIndex = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)
+        auto actionPtrIdx = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)
                 >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
         aout << "Pointer(s): ";
 
-        // get the x and y position of this event if it is not ACTION_MOVE.
-        auto &pointer = motionEvent.pointers[pointerIndex];
-        auto x = GameActivityPointerAxes_getX(&pointer);
-        auto y = GameActivityPointerAxes_getY(&pointer);
 
-        // determine the action type and process the event accordingly.
-        switch (action & AMOTION_EVENT_ACTION_MASK) {
-            case AMOTION_EVENT_ACTION_DOWN:
-            case AMOTION_EVENT_ACTION_POINTER_DOWN:
-                aout << "(" << pointer.id << ", " << x << ", " << y << ") "
-                     << "Pointer Down";
-                break;
-
-            case AMOTION_EVENT_ACTION_CANCEL:
-                // treat the CANCEL as an UP event: doing nothing in the app, except
-                // removing the pointer from the cache if pointers are locally saved.
-                // code pass through on purpose.
-            case AMOTION_EVENT_ACTION_UP:
-            case AMOTION_EVENT_ACTION_POINTER_UP:
-                aout << "(" << pointer.id << ", " << x << ", " << y << ") "
-                     << "Pointer Up";
-                break;
-
-            case AMOTION_EVENT_ACTION_MOVE:
-                // There is no pointer index for ACTION_MOVE, only a snapshot of
-                // all active pointers; app needs to cache previous active pointers
-                // to figure out which ones are actually moved.
-                for (auto index = 0; index < motionEvent.pointerCount; index++) {
-                    pointer = motionEvent.pointers[index];
-                    x = GameActivityPointerAxes_getX(&pointer);
-                    y = GameActivityPointerAxes_getY(&pointer);
-                    aout << "(" << pointer.id << ", " << x << ", " << y << ")";
-
-                    if (index != (motionEvent.pointerCount - 1)) aout << ",";
-                    aout << " ";
+        for (int ptr_idx = 0; ptr_idx < motionEvent.pointerCount; ++ptr_idx)
+        {
+            auto &pointer = motionEvent.pointers[ptr_idx];
+            auto x = GameActivityPointerAxes_getX(&pointer);
+            auto y = GameActivityPointerAxes_getY(&pointer);
+            auto a = action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK;
+            // get the x and y position of this event if it is not ACTION_MOVE.        
+            // determine the action type and process the event accordingly.
+            switch (action & AMOTION_EVENT_ACTION_MASK)
+            {
+                case AMOTION_EVENT_ACTION_DOWN:
+                case AMOTION_EVENT_ACTION_POINTER_DOWN:
+                {
+                    aout << "(" << pointer.id << ", " << x << ", " << y << ") "
+                         << "Pointer Down";
+                    
+                    if (actionPtrIdx == ptr_idx && x < width_/3)
+                    {
+                        MoveForward = true;
+                        aout << " MoveForward = true; ";
+                    }
+                        
+                    break;
                 }
-                aout << "Pointer Move";
-                break;
-            default:
-                aout << "Unknown MotionEvent Action: " << action;
-        }
+                case AMOTION_EVENT_ACTION_CANCEL:
+                    // treat the CANCEL as an UP event: doing nothing in the app, except
+                    // removing the pointer from the cache if pointers are locally saved.
+                    // code pass through on purpose.
+                case AMOTION_EVENT_ACTION_UP:
+                case AMOTION_EVENT_ACTION_POINTER_UP:
+                {
+                    aout << "(" << pointer.id << ", " << x << ", " << y << ") "
+                         << "Pointer Up";
+                    if (actionPtrIdx == ptr_idx &&  x>width_/3) // right side pad
+                        firstMouse_ = true;
+                    
+                    if (actionPtrIdx == ptr_idx && x<width_/3) // left side pad
+                    {
+                        MoveForward = false;
+                        aout << " MoveForward = false; ";
+                    }
+                    break;
+                }
+
+                case AMOTION_EVENT_ACTION_MOVE:
+                {
+                    if (x>width_/3) // right side pad
+                    {
+                        if (firstMouse_)
+                        {
+                            lastX_ = x;
+                            lastY_ = y;
+                            firstMouse_ = false;
+                        }
+
+                        float xoffset = x - lastX_;
+                        float yoffset = lastY_ - y; // reversed since y-coordinates go from bottom to top
+
+                        lastX_ = x;
+                        lastY_ = y;
+
+                        camera_.ProcessMouseMovement(xoffset, yoffset);
+                    }
+                    
+                    aout << "(" << pointer.id << ", " << x << ", " << y << ") "
+                         << "Pointer Down";
+                
+                    // There is no pointer index for ACTION_MOVE, only a snapshot of
+                    // all active pointers; app needs to cache previous active pointers
+                    // to figure out which ones are actually moved.
+                    for (auto index = 0; index < motionEvent.pointerCount; index++)
+                    {
+                        pointer = motionEvent.pointers[index];
+                        x = GameActivityPointerAxes_getX(&pointer);
+                        y = GameActivityPointerAxes_getY(&pointer);
+                        aout <<  "(" << pointer.id << ", " << x << ", " << y << ")";
+
+                        if (index != (motionEvent.pointerCount - 1)) aout << ",";
+                        aout << " ";
+                    }
+                    aout << "Pointer Move";
+                    break;
+                }
+                default:
+                    aout << "Unknown MotionEvent Action: " << action;     
+            }
+            }
         aout << std::endl;
     }
     // clear the motion input count in this buffer for main thread to re-use.
     android_app_clear_motion_events(inputBuffer);
 
     // handle input key events.
-    for (auto i = 0; i < inputBuffer->keyEventsCount; i++) {
+    for (auto i = 0; i < inputBuffer->keyEventsCount; i++)
+    {
         auto &keyEvent = inputBuffer->keyEvents[i];
         aout << "Key: " << keyEvent.keyCode << " ";
-        switch (keyEvent.action) {
+        switch (keyEvent.action)
+        {
             case AKEY_EVENT_ACTION_DOWN:
                 aout << "Key Down";
                 break;

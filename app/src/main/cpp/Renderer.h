@@ -7,6 +7,7 @@
 #include "Model.h"
 #include "Shader.h"
 #include "Animator.h"
+#include "Camera.h"
 
 struct android_app;
 
@@ -23,7 +24,11 @@ public:
             width_(0),
             height_(0),
             shader_(Shader()),
-            animator(0),
+            animator_(0),
+            camera_(glm::vec3(0.0f, 0.0f, 3.0f)),
+            lastX_(0),
+            lastY_(0),
+            firstMouse_(true),
             shaderNeedsNewProjectionMatrix_(true) {
         initRenderer();
     }
@@ -73,7 +78,13 @@ private:
 
     Shader shader_;
     std::vector<Model> models_;
-    Animator animator;
+    Animator animator_;
+
+    // camera
+    Camera camera_;
+    float lastX_;
+    float lastY_;
+    bool firstMouse_;
 
 
 };

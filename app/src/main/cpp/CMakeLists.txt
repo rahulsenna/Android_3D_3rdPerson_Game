@@ -21,15 +21,16 @@ set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(assimp)
 
 add_library(game SHARED
-        main.cpp
-        Model.cpp
         AndroidOut.cpp
-        Renderer.cpp
-        Shader.cpp
-        TextureAsset.cpp
         Animation.cpp
         Animator.cpp
         Bone.cpp
+        Camera.cpp
+        main.cpp
+        Model.cpp
+        Renderer.cpp
+        Shader.cpp
+        TextureAsset.cpp
         Utility.cpp)
 
 # Searches for a package provided by the game activity dependency
