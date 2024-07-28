@@ -29,6 +29,7 @@ add_library(game SHARED
         TextureAsset.cpp
         Animation.cpp
         Animator.cpp
+        Bone.cpp
         Utility.cpp)
 
 # Searches for a package provided by the game activity dependency

@@ -100,8 +100,8 @@ void Renderer::render()
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -4.0f)); // translate it down so it's at the center of the scene
-    model = glm::scale(model, glm::vec3(.1f, .1f, .1f));	// it's a bit too big for our scene, so scale it down
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -3.0f)); // translate it down so it's at the center of the scene
+    // model = glm::scale(model, glm::vec3(.01f, .01f, .01f));	// it's a bit too big for our scene, so scale it down
     shader_.setMat4("model", model);
     models_.front().Draw(shader_);
 
@@ -198,8 +198,8 @@ void Renderer::initRenderer()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     shader_ = Shader("shaders/model.vs", "shaders/model.fs");
-    Model ourModel("models/lady/model.fbx");
-    auto jogAnimation = new Animation("models/lady/model.fbx",&ourModel);
+    Model ourModel("models/sophie/model.dae");
+    auto jogAnimation = new Animation("models/sophie/jogging.dae",&ourModel);
     animator = Animator(jogAnimation);
 
     models_.emplace_back(ourModel);

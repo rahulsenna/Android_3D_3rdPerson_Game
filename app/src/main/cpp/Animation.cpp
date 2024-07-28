@@ -1,5 +1,6 @@
 #include "Animation.h"
 #include "AndroidOut.h"
+#include "assimp_glm_helpers.h"
 
 
 Animation::Animation(const std::string& animationPath, Model* model)
