@@ -65,6 +65,26 @@ float deltaTime = 0.0f;
 auto lastFrameTime =  std::chrono::high_resolution_clock::now();
 #include <chrono>
 
+//--[ Ground Plane Setup ]----------------------------------------------------------------------
+GLfloat planeVertices[] = {
+    // Positions
+    10000.0f,  10000.0f,  // Vertex 0
+   -10000.0f,  10000.0f,  // Vertex 1
+   -10000.0f, -10000.0f,  // Vertex 2
+    10000.0f, -10000.0f,  // Vertex 3
+};
+GLuint planeIndices[] = {
+    0, 1, 2,  // First triangle
+    0, 2, 3   // Second triangle
+};
+
+GLuint planeVAO, planeVBO, ebo;
+Shader GroundPlane;
+GLint viewLoc;
+GLint projLoc;
+//--[ Ground Plane Setup ]----------------------------------------------------------------------
+
+
 void Renderer::render()
 {
     // Check to see if the surface has changed size. This is _necessary_ to do every frame when
@@ -109,7 +129,13 @@ void Renderer::render()
     shader_.setMat4("model", model);
     models_.front().Draw(shader_);
 
-
+//--[ Ground Plane ]----------------------------------------------------------------------
+    GroundPlane.use();
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(camera_.GetViewMatrix()));
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+    glBindVertexArray(planeVAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+//--[ Ground Plane ]----------------------------------------------------------------------
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
@@ -207,6 +233,30 @@ void Renderer::initRenderer()
     animator_ = Animator(jogAnimation);
 
     models_.emplace_back(ourModel);
+
+//--[ Ground Plane Setup ]----------------------------------------------------------------------
+ 
+    GroundPlane = Shader("shaders/ground_plane.vs", "shaders/ground_plane.fs");
+    glGenVertexArrays(1, &planeVAO);
+    glBindVertexArray(planeVAO);
+	
+    glGenBuffers(1, &planeVBO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
+
+	 // Generate and bind index buffer
+    GLuint planeEbo;
+    glGenBuffers(1, &planeEbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planeEbo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(planeIndices), planeIndices, GL_STATIC_DRAW);
+    
+	viewLoc = glGetUniformLocation(GroundPlane.program_, "view");
+	projLoc = glGetUniformLocation(GroundPlane.program_, "projection");
+//--[ Ground Plane Setup ]----------------------------------------------------------------------
 }
 
 void Renderer::updateRenderArea() {
@@ -264,7 +314,6 @@ void Renderer::handleInput()
             auto &pointer = motionEvent.pointers[ptr_idx];
             auto x = GameActivityPointerAxes_getX(&pointer);
             auto y = GameActivityPointerAxes_getY(&pointer);
-            auto a = action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK;
             // get the x and y position of this event if it is not ACTION_MOVE.        
             // determine the action type and process the event accordingly.
             switch (action & AMOTION_EVENT_ACTION_MASK)
