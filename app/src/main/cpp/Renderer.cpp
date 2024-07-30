@@ -68,10 +68,10 @@ auto lastFrameTime =  std::chrono::high_resolution_clock::now();
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
 GLfloat planeVertices[] = {
     // Positions
-    10000.0f,  10000.0f,  // Vertex 0
-   -10000.0f,  10000.0f,  // Vertex 1
-   -10000.0f, -10000.0f,  // Vertex 2
-    10000.0f, -10000.0f,  // Vertex 3
+    1.0f,  1.0f,  // Vertex 0
+   -1.0f,  1.0f,  // Vertex 1
+   -1.0f, -1.0f,  // Vertex 2
+    1.0f, -1.0f,  // Vertex 3
 };
 GLuint planeIndices[] = {
     0, 1, 2,  // First triangle
@@ -82,6 +82,11 @@ GLuint planeVAO, planeVBO, ebo;
 Shader GroundPlane;
 GLint viewLoc;
 GLint projLoc;
+GLint nearFarLoc;
+
+float near = 0.1f;
+float far  = 1000.0f;
+auto near_far = glm::vec2(near, far);
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
 
 
@@ -124,13 +129,14 @@ void Renderer::render()
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -3.0f)); // translate it down so it's at the center of the scene
+    // model = glm::translate(model, glm::vec3(0.0f, 0.0f, -3.0f)); // translate it down so it's at the center of the scene
     // model = glm::scale(model, glm::vec3(.01f, .01f, .01f));	// it's a bit too big for our scene, so scale it down
     shader_.setMat4("model", model);
     models_.front().Draw(shader_);
 
 //--[ Ground Plane ]----------------------------------------------------------------------
     GroundPlane.use();
+    glUniform1fv(nearFarLoc, 2, glm::value_ptr(near_far));
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(camera_.GetViewMatrix()));
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
     glBindVertexArray(planeVAO);
@@ -256,6 +262,7 @@ void Renderer::initRenderer()
     
 	viewLoc = glGetUniformLocation(GroundPlane.program_, "view");
 	projLoc = glGetUniformLocation(GroundPlane.program_, "projection");
+    nearFarLoc = glGetUniformLocation(GroundPlane.program_, "u_nearfar");
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
 }
 
@@ -280,12 +287,17 @@ void Renderer::updateRenderArea() {
 }
 
 bool MoveForward = false;
+bool MoveBackward = false;
 
 void Renderer::handleInput()
 {
     if (MoveForward)
     {
         camera_.ProcessKeyboard(FORWARD, deltaTime);
+    }
+    if (MoveBackward)
+    {
+        camera_.ProcessKeyboard(BACKWARD, deltaTime);
     }
 
     // handle all queued inputs
@@ -326,7 +338,10 @@ void Renderer::handleInput()
                     
                     if (actionPtrIdx == ptr_idx && x < width_/3)
                     {
-                        MoveForward = true;
+                        if (y>height_- height_/10)
+                            MoveBackward = true;
+                        else
+                            MoveForward = true;
                         aout << " MoveForward = true; ";
                     }
                         
@@ -347,6 +362,7 @@ void Renderer::handleInput()
                     if (actionPtrIdx == ptr_idx && x<width_/3) // left side pad
                     {
                         MoveForward = false;
+                        MoveBackward = false;
                         aout << " MoveForward = false; ";
                     }
                     break;
@@ -369,7 +385,19 @@ void Renderer::handleInput()
                         lastX_ = x;
                         lastY_ = y;
 
-                        camera_.ProcessMouseMovement(xoffset, yoffset);
+                        camera_.ProcessMouseMovement(xoffset, yoffset);                        
+                    } else
+                    {
+                        if (y>height_- height_/10)
+                        {
+                            MoveBackward = true;
+                            MoveForward = false;
+                        }
+                        else
+                        {
+                            MoveForward = true;
+                            MoveBackward = false;   
+                        }
                     }
                     
                     aout << "(" << pointer.id << ", " << x << ", " << y << ") "

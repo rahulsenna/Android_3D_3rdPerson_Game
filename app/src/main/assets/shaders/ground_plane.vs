@@ -1,13 +1,27 @@
 #version 300 es
-precision mediump float;
-in vec2 P;               // position attr from the vbo
+layout (location = 0) in vec2 a_position;
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+  precision highp float;
+#else
+  precision mediump float;
+#endif
 
-uniform mat4 projection; // projection matrix
-uniform mat4 view;       // modelview matrix
+layout(location = 0) out vec4 o_color;
+out vec3 near;
+out vec3 far;
 
-out vec3 vertexPosition; // vertex position for the fragment shader
+uniform mat4 view;
+uniform mat4 projection;
+
+vec3 unproject_point(float x, float y, float z) {
+    mat4 inv = inverse(projection * view);
+    vec4 unproj_point = inv * vec4(x, y, z, 1.f);
+    return unproj_point.xyz / unproj_point.w;
+}
 
 void main() {
-	vertexPosition = vec3(P.x,0,P.y);
-	gl_Position = projection * view * vec4(P.x,0,P.y, 1);
+    vec2 p = a_position;
+    near = unproject_point(p.x, p.y, -1.f);
+    far  = unproject_point(p.x, p.y,  1.f);
+    gl_Position = vec4(a_position, 0.0f, 1.0f);
 }

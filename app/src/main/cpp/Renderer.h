@@ -25,7 +25,7 @@ public:
             height_(0),
             shader_(Shader()),
             animator_(0),
-            camera_(glm::vec3(0.0f, 0.0f, 3.0f)),
+            camera_(glm::vec3(0.0f, 3.0f, 5.0f)),
             lastX_(0),
             lastY_(0),
             firstMouse_(true),
