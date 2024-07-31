@@ -88,7 +88,9 @@ float near = 0.1f;
 float far  = 1000.0f;
 auto near_far = glm::vec2(near, far);
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
+glm::mat4 projection;
 
+#include "Physics.h"
 
 void Renderer::render()
 {
@@ -101,6 +103,7 @@ void Renderer::render()
     deltaTime = duration.count();
     lastFrameTime = currentFrameTime;
 
+    StepPhysics(deltaTime);
     animator_.UpdateAnimation(deltaTime);
 
 
@@ -112,7 +115,6 @@ void Renderer::render()
     shader_.use();
 
     // view/projection transformations
-    glm::mat4 projection = glm::perspective(glm::radians((float)60), (float)width_ / (float)height_, 0.1f, 100.0f);
 
     
     
@@ -142,6 +144,8 @@ void Renderer::render()
     glBindVertexArray(planeVAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 //--[ Ground Plane ]----------------------------------------------------------------------
+
+    PhysXDebugRender(view);
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
@@ -264,6 +268,7 @@ void Renderer::initRenderer()
 	projLoc = glGetUniformLocation(GroundPlane.program_, "projection");
     nearFarLoc = glGetUniformLocation(GroundPlane.program_, "u_nearfar");
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
+    InitPhysics();
 }
 
 void Renderer::updateRenderArea() {
@@ -283,6 +288,7 @@ void Renderer::updateRenderArea() {
         lastX_ = width_ / 2.0f;
         lastY_ = height_ / 2.0f;
         firstMouse_ = true;
+        projection = glm::perspective(glm::radians((float)60), (float)width_ / (float)height_, 0.1f, 100.0f);
     }
 }
 

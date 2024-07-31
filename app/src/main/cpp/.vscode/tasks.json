@@ -63,6 +63,23 @@
                 "isDefault": false
             },
             "dependsOn": "Install APK"
+        },
+        {
+            "type": "shell",
+            "label": "LOG APK",
+            "command": "adb",
+            "args": [
+                "logcat", "-v", "color", "--pid=$(adb","shell", "pidof", "-s", "com.example.game)"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/../../../../",
+            },
+
+            "group": {
+                "kind": "none",
+                "isDefault": false
+            },
+            "dependsOn": "RUN APK"
         }
 
 

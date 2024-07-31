@@ -11,7 +11,7 @@
 - [License](#license)
 
 ## Screenshot
-![ScreenShot1.jpg](docs%2FScreenhots%2FSimpleCameraMovement.gif)
+![ScreenShot1.jpg](docs%2FScreenhots%2FPhysXDemo.gif)
 
 ## Prerequisites
 

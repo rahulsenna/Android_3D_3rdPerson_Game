@@ -7,6 +7,7 @@ project("Android_3D_3rdPerson_Game")
 
 # Creates your game shared library. The name must be the same as the
 # one used for loading in your Kotlin/Java or AndroidManifest.txt files.
+add_definitions(-D_DEBUG)
 
 include(FetchContent)
 set(FETCHCONTENT_BASE_DIR ${PROJECT_SOURCE_DIR}/libs CACHE PATH "Missing description." FORCE)
@@ -39,8 +40,15 @@ find_package(game-activity REQUIRED CONFIG)
 include_directories(
         includes
         libs/assimp-src/includes
+        
+        #PhysX
+        includes/physx
+        includes/physx_source_foundation
+        includes/pxshared/include
 )
-
+link_directories(
+        static_libs/physx/debug
+)
 # Configure libraries CMake uses to link your target library.
 target_link_libraries(game
         # The game activity
@@ -54,4 +62,16 @@ target_link_libraries(game
         android
         log
         assimp
+
+        #PhysX
+        ${CMAKE_CURRENT_SOURCE_DIR}/static_libs/physx/debug/libPhysX_static.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/static_libs/physx/debug/libPhysXCharacterKinematic_static.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/static_libs/physx/debug/libPhysXCommon_static.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/static_libs/physx/debug/libPhysXCooking_static.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/static_libs/physx/debug/libPhysXExtensions_static.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/static_libs/physx/debug/libPhysXFoundation_static.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/static_libs/physx/debug/libPhysXPvdSDK_static.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/static_libs/physx/debug/libPhysXVehicle_static.a
+
+        
 )
