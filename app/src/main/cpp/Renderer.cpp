@@ -13,6 +13,18 @@
 #include "Animation.h"
 #include "Animator.h"
 
+unordered_map<std::string, Shader*> shaders_;
+std::vector<Model> models_;
+// Animator *m_Animator;
+
+// camera
+bool firstMouse_;
+float lastX_=0, lastY_=0;
+Camera camera_ = glm::vec3(0,3,5);
+
+
+
+
 //! executes glGetString and outputs the result to logcat
 #define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
 
@@ -91,6 +103,7 @@ auto near_far = glm::vec2(near, far);
 glm::mat4 projection;
 
 #include "Physics.h"
+bool PhysXDebug = false;
 
 void Renderer::render()
 {
@@ -104,37 +117,36 @@ void Renderer::render()
     lastFrameTime = currentFrameTime;
 
     StepPhysics(deltaTime);
-    animator_.UpdateAnimation(deltaTime);
-
-
+    
 
     // clear the color buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // don't forget to enable shader before setting uniforms
-    shader_.use();
-
-    // view/projection transformations
-
-    
-    
-    // view = glm::rotate(view, 20.f, glm::vec3(1,1,0));
-
-    shader_.setMat4("projection", projection);
     
     // camera/view transformation
     glm::mat4 view = camera_.GetViewMatrix();
-    shader_.setMat4("view", view);
-
-	for (int i = 0; i < animator_.m_FinalBoneMatrices.size(); ++i)
-		shader_.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", animator_.m_FinalBoneMatrices[i]);
-
-    // render the loaded model
-    glm::mat4 model = glm::mat4(1.0f);
-    // model = glm::translate(model, glm::vec3(0.0f, 0.0f, -3.0f)); // translate it down so it's at the center of the scene
-    // model = glm::scale(model, glm::vec3(.01f, .01f, .01f));	// it's a bit too big for our scene, so scale it down
-    shader_.setMat4("model", model);
-    models_.front().Draw(shader_);
+    
+    for (auto &model: models_)
+    {
+        model.m_Shader->use();
+        if (model.m_Animator)
+        {
+            model.m_Animator->UpdateAnimation(deltaTime);
+            for (int i = 0; i < model.m_Animator->m_FinalBoneMatrices.size(); ++i)
+            {
+		        model.m_Shader->setMat4("finalBonesMatrices[" + std::to_string(i) + "]", model.m_Animator->m_FinalBoneMatrices[i]);    
+            }
+        }
+        
+        
+        auto transform = glm::translate(glm::mat4(1.f), model.m_Position);
+        transform =  glm::scale(transform, model.m_Scale);
+        // transform =  glm::rotate(transform, model.m_Rotation);;
+        model.m_Shader->setMat4("projection", projection);
+        model.m_Shader->setMat4("view", view);
+        model.m_Shader->setMat4("model", transform);
+        model.Draw(model.m_Shader->program_);
+        
+    }
 
 //--[ Ground Plane ]----------------------------------------------------------------------
     GroundPlane.use();
@@ -143,16 +155,124 @@ void Renderer::render()
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
     glBindVertexArray(planeVAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-//--[ Ground Plane ]----------------------------------------------------------------------
-
-    PhysXDebugRender(view);
+//--[  Ground Plane ]----------------------------------------------------------------------
+    if (PhysXDebug)
+        PhysXDebugRender(view);
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
     assert(swapResult == EGL_TRUE);
 }
 
+#include "Content.h"
 
+void InitGroundPlane()
+{
+//--[ Ground Plane Setup ]----------------------------------------------------------------------
+ 
+    GroundPlane = Shader("shaders/ground_plane.vs", "shaders/ground_plane.fs");
+    glGenVertexArrays(1, &planeVAO);
+    glBindVertexArray(planeVAO);
+	
+    glGenBuffers(1, &planeVBO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
+
+	 // Generate and bind index buffer
+    GLuint planeEbo;
+    glGenBuffers(1, &planeEbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planeEbo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(planeIndices), planeIndices, GL_STATIC_DRAW);
+    
+	viewLoc = glGetUniformLocation(GroundPlane.program_, "view");
+	projLoc = glGetUniformLocation(GroundPlane.program_, "projection");
+    nearFarLoc = glGetUniformLocation(GroundPlane.program_, "u_nearfar");
+//--[ Ground Plane Setup ]----------------------------------------------------------------------
+}
+
+
+void AddPhysicsStuff()
+{
+        PxRigidStatic *groundPlane = PxCreateStatic(*PhysXSDK, 
+                                                PxTransform(PxVec3(0)),
+                                                PxBoxGeometry(500.f, 0.001, 500.f),
+                                                *DefaultMaterialPhysX);
+    ScenePhysX->addActor(*groundPlane);
+
+    for (int i = 0; i < 100; ++i)
+    {
+        float r = (float)rand()/ (float)RAND_MAX;
+        float s = (float)rand()/ (float)RAND_MAX;
+        float t = (float)rand()/ (float)RAND_MAX;
+        
+        PxRigidDynamic *Ball = PxCreateDynamic(*PhysXSDK,
+                                               PxTransform(PxVec3(r*2,r*100.f,r*11)),
+                                               PxSphereGeometry(s),
+                                               *DefaultMaterialPhysX, 100.0f);
+
+        Ball->setAngularDamping(r*2);
+        Ball->setLinearVelocity(PxVec3(0));
+        ScenePhysX->addActor(*Ball);
+
+        PxRigidDynamic *Box = PxCreateDynamic(*PhysXSDK,
+                                              PxTransform(PxVec3(r*2,s*10.f,t*11)),
+                                              PxBoxGeometry(r*2, s*2, t*2),
+                                              *DefaultMaterialPhysX, 100.0f);
+        ScenePhysX->addActor(*Box);
+    }
+}
+void AddStuff()
+{
+
+    AddPhysicsStuff();
+
+    shaders_["anim_model"] = new Shader("shaders/modelAnim.vs", "shaders/model.fs");
+    shaders_["model"] = new Shader("shaders/model.vs", "shaders/model.fs");
+    
+    
+    Model Sophie("models/sophie/model.dae",glm::vec3(0));
+    Sophie.m_Shader = shaders_["anim_model"];
+    Sophie.m_Animator = new Animator(new Animation("models/sophie/anim/JogForward.dae",&Sophie));
+    models_.emplace_back(Sophie);
+    
+    Model VanGuard("models/van/model.dae", glm::vec3(-2,0,0));
+    VanGuard.m_Shader = shaders_["anim_model"];
+    VanGuard.m_Animator = new Animator(new Animation("models/van/anim/WalkingHitReaction.dae",&VanGuard));
+    models_.emplace_back(VanGuard);
+
+    Model Aris("models/arisa/model.dae", glm::vec3(-4,0,0));
+    Aris.m_Shader = shaders_["anim_model"];
+    Aris.m_Animator = new Animator(new Animation("models/arisa/anim/StandingRunForward.dae",&Aris));
+    models_.emplace_back(Aris);
+    
+    Model Maria("models/maria/model.dae", glm::vec3(2,0,0));
+    Maria.m_Shader = shaders_["anim_model"];
+    Maria.m_Animator = new Animator(new Animation("models/maria/anim/SwordFightOne.dae",&Maria));
+    models_.emplace_back(Maria);
+
+    //-------[ Houses ]------------------------------------
+    Model House1("models/HOUSES/house-home-1/source/model.fbx", glm::vec3(-40,0,-100), glm::vec3(.01));
+    House1.m_Shader = shaders_["model"];
+    models_.emplace_back(House1);
+
+    Model House2("models/HOUSES/morden_wood_cabin/scene.gltf", glm::vec3(-4,0,-100), glm::vec3(.01));
+    House2.m_Shader = shaders_["model"];
+    models_.emplace_back(House2);
+    
+    /*
+    Model Raptor("models/raptor.glb", glm::vec3(4,0,0), glm::vec3(.01));
+    Raptor.m_Shader = shaders_["model"];
+    Raptor.m_Animator = new Animator(new Animation("models/raptor.glb",&Raptor));
+    models_.emplace_back(Raptor); 
+    */
+    
+
+
+}
 
 void Renderer::initRenderer()
 {
@@ -237,38 +357,10 @@ void Renderer::initRenderer()
     glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    shader_ = Shader("shaders/model.vs", "shaders/model.fs");
-    Model ourModel("models/sophie/model.dae");
-    auto jogAnimation = new Animation("models/sophie/anim/Idle.dae",&ourModel);
-    animator_ = Animator(jogAnimation);
 
-    models_.emplace_back(ourModel);
-
-//--[ Ground Plane Setup ]----------------------------------------------------------------------
- 
-    GroundPlane = Shader("shaders/ground_plane.vs", "shaders/ground_plane.fs");
-    glGenVertexArrays(1, &planeVAO);
-    glBindVertexArray(planeVAO);
-	
-    glGenBuffers(1, &planeVBO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
-    glEnableVertexAttribArray(0);
-
-	 // Generate and bind index buffer
-    GLuint planeEbo;
-    glGenBuffers(1, &planeEbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planeEbo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(planeIndices), planeIndices, GL_STATIC_DRAW);
-    
-	viewLoc = glGetUniformLocation(GroundPlane.program_, "view");
-	projLoc = glGetUniformLocation(GroundPlane.program_, "projection");
-    nearFarLoc = glGetUniformLocation(GroundPlane.program_, "u_nearfar");
-//--[ Ground Plane Setup ]----------------------------------------------------------------------
+    InitGroundPlane();
     InitPhysics();
+    AddStuff(); // Content
 }
 
 void Renderer::updateRenderArea() {

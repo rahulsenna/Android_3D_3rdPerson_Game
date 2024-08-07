@@ -19,10 +19,18 @@
 
 #include "BoneInfo.h"
 
+class Animator;  // Forward declaration of class Animator
+
 class Model 
 {
 public:
     std::map<string, BoneInfo> m_BoneInfoMap; //
+    glm::vec3 m_Position = glm::vec3(0);
+    glm::vec3 m_Scale = glm::vec3(1);
+    glm::vec3 m_Rotate = glm::ivec3(0);
+    Animator *m_Animator = 0;
+    Shader *m_Shader;
+
     int m_BoneCounter = 0;
 
     auto& GetBoneInfoMap() { return m_BoneInfoMap; }
@@ -45,13 +53,20 @@ public:
     bool gammaCorrection;
 
     // constructor, expects a filepath to a 3D model.
-    Model(std::string const &path, bool gamma = false) : gammaCorrection(gamma)
+    Model(std::string const &path,  glm::vec3 position = glm::vec3(0),
+                                    glm::vec3 scale = glm::vec3(1),
+                                    glm::vec3 rotate = glm::ivec3(0),
+                                    bool gamma = false) : 
+                                    gammaCorrection(gamma),
+                                    m_Position(position),
+                                    m_Scale(scale),
+                                    m_Rotate(rotate)
     {
         loadModel(path);
     }
 
     // draws the model, and thus all its meshes
-    void Draw(Shader &shader);
+    void Draw(uint32_t shader);
     
     
 private:

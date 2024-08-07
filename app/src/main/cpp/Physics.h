@@ -1,3 +1,5 @@
+#pragma once
+
 #include "PxPhysicsAPI.h"
 using namespace physx;
 
@@ -104,37 +106,6 @@ void InitPhysics()
     }
 
     DefaultMaterialPhysX = PhysXSDK->createMaterial(0.5f, 0.5f, 0.6f);
-
-    // ----------------------------------Extra-----------------------------------------
-    PxRigidStatic *groundPlane = PxCreateStatic(*PhysXSDK, 
-                                                PxTransform(PxVec3(0)),
-                                                PxBoxGeometry(500.f, 0.001, 500.f),
-                                                *DefaultMaterialPhysX);
-    ScenePhysX->addActor(*groundPlane);
-
-    for (int i = 0; i < 100; ++i)
-    {
-        float r = (float)rand()/ (float)RAND_MAX;
-        float s = (float)rand()/ (float)RAND_MAX;
-        float t = (float)rand()/ (float)RAND_MAX;
-        
-        PxRigidDynamic *Ball = PxCreateDynamic(*PhysXSDK,
-                                               PxTransform(PxVec3(r*2,r*100.f,r*11)),
-                                               PxSphereGeometry(s),
-                                               *DefaultMaterialPhysX, 100.0f);
-
-        Ball->setAngularDamping(r*2);
-        Ball->setLinearVelocity(PxVec3(0));
-        ScenePhysX->addActor(*Ball);
-
-        PxRigidDynamic *Box = PxCreateDynamic(*PhysXSDK,
-                                              PxTransform(PxVec3(r*2,s*10.f,t*11)),
-                                              PxBoxGeometry(r*2, s*2, t*2),
-                                              *DefaultMaterialPhysX, 100.0f);
-        ScenePhysX->addActor(*Box);
-
-    }
-
     
 
     PhysXShader = Shader("shaders/simple.vs", "shaders/simple.fs");

@@ -17,7 +17,7 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
 
 
 // draws the model, and thus all its meshes
-void Model::Draw(Shader& shader)
+void Model::Draw(uint32_t shader)
 {
     for (unsigned int i = 0; i < meshes.size(); i++)
         meshes[i].Draw(shader);
@@ -75,42 +75,26 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
     vector<unsigned int> indices;
     vector<std::shared_ptr<TextureAsset>> textures;
 
+    Vertex initialized_vertex;
+    SetVertexBoneDataToDefault(initialized_vertex);
     // walk through each of the mesh's vertices
     for (unsigned int i = 0; i < mesh->mNumVertices; i++)
     {
-        Vertex vertex;
-        SetVertexBoneDataToDefault(vertex);
-        vertex.Position = AssimpGLMHelpers::GetGLMVec(mesh->mVertices[i]);
-        vertex.Normal = AssimpGLMHelpers::GetGLMVec(mesh->mNormals[i]);
-        glm::vec3 vector; // we declare a placeholder vector since assimp uses its own vector class that doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
+        Vertex vertex = initialized_vertex;
+        vertex.Position = glm::vec3(mesh->mVertices[i].x,mesh->mVertices[i].y,mesh->mVertices[i].z);
  
         // normals
         if (mesh->HasNormals())
-        {
-            vector.x = mesh->mNormals[i].x;
-            vector.y = mesh->mNormals[i].y;
-            vector.z = mesh->mNormals[i].z;
-            vertex.Normal = vector;
-        }
+            vertex.Normal = glm::vec3(mesh->mNormals[i].x,mesh->mNormals[i].y,mesh->mNormals[i].z);
+        
         // texture coordinates
         if (mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
         {
-            glm::vec2 vec;
-            // a vertex can contain up to 8 different texture coordinates. We thus make the assumption that we won't 
-            // use models where a vertex can have multiple texture coordinates so we always take the first set (0).
-            vec.x = mesh->mTextureCoords[0][i].x;
-            vec.y = mesh->mTextureCoords[0][i].y;
-            vertex.TexCoords = vec;
+            vertex.TexCoords = glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
             // tangent
-            vector.x = mesh->mTangents[i].x;
-            vector.y = mesh->mTangents[i].y;
-            vector.z = mesh->mTangents[i].z;
-            vertex.Tangent = vector;
+            vertex.Tangent = glm::vec3(mesh->mTangents[i].x,mesh->mTangents[i].y,mesh->mTangents[i].z);
             // bitangent
-            vector.x = mesh->mBitangents[i].x;
-            vector.y = mesh->mBitangents[i].y;
-            vector.z = mesh->mBitangents[i].z;
-            vertex.Bitangent = vector;
+            vertex.Bitangent = glm::vec3(mesh->mBitangents[i].x,mesh->mBitangents[i].y,mesh->mBitangents[i].z);
         }
         else
             vertex.TexCoords = glm::vec2(0.0f, 0.0f);
@@ -154,9 +138,12 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
 void 
 Model::SetVertexBoneData(Vertex& vertex, int boneID, float weight)
 {
+    if (weight == 0)
+        return; 
+    
     for (int i = 0; i < MAX_BONE_INFLUENCE; ++i)
     {
-        if (vertex.m_BoneIDs[i] < 0)
+        if (vertex.m_BoneIDs[i] == -1)
         {
             vertex.m_Weights[i] = weight;
             vertex.m_BoneIDs[i] = boneID;

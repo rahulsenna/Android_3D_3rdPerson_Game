@@ -23,12 +23,6 @@ public:
             context_(EGL_NO_CONTEXT),
             width_(0),
             height_(0),
-            shader_(Shader()),
-            animator_(0),
-            camera_(glm::vec3(0.0f, 3.0f, 5.0f)),
-            lastX_(0),
-            lastY_(0),
-            firstMouse_(true),
             shaderNeedsNewProjectionMatrix_(true) {
         initRenderer();
     }
@@ -75,18 +69,6 @@ private:
     EGLint height_;
 
     bool shaderNeedsNewProjectionMatrix_;
-
-    Shader shader_;
-    std::vector<Model> models_;
-    Animator animator_;
-
-    // camera
-    Camera camera_;
-    float lastX_;
-    float lastY_;
-    bool firstMouse_;
-
-
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H
