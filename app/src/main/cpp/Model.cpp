@@ -30,7 +30,7 @@ void Model::loadModel(string const& path)
     // read file via ASSIMP
 
     Assimp::Importer* importer = new Assimp::Importer();
-    Assimp::AndroidJNIIOSystem *ioSystem = new Assimp::AndroidJNIIOSystem(reinterpret_cast<ANativeActivity*>(g_App->activity));
+    Assimp::AndroidJNIIOSystem *ioSystem = new Assimp::AndroidJNIIOSystem(EXTERN_ASSET_DIR, g_AssetManager);
     assert(ioSystem);
     importer->SetIOHandler(ioSystem);
 

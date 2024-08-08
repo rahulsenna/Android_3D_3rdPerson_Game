@@ -2,6 +2,12 @@
 #include "AndroidOut.h"
 #include "Utility.h"
 
+#include <iostream>
+#include <fstream>
+#include <assert.h>
+#include "global.h"
+
+
 std::shared_ptr<TextureAsset>
 TextureAsset::loadAsset(AImageDecoder *pAndroidDecoder, const std::string &assetPath, const std::string &assetType)
 {
@@ -63,21 +69,43 @@ TextureAsset::loadAsset(AAssetManager *assetManager, const std::string &assetPat
 
     aout << "assetPath: " << assetPath << std::endl;
     // Get the image from asset manager
-    auto pAndroidRobotPng = AAssetManager_open(
+    auto pTextureAsset = AAssetManager_open(
             assetManager,
             assetPath.c_str(),
             AASSET_MODE_BUFFER);
 
     // Make a decoder to turn it into a texture
-    AImageDecoder *pAndroidDecoder = nullptr;
-    auto result = AImageDecoder_createFromAAsset(pAndroidRobotPng, &pAndroidDecoder);
-    assert(result == ANDROID_IMAGE_DECODER_SUCCESS);
+    AImageDecoder *pTextureImgDecoder = nullptr;
+    if (pTextureAsset)
+    {
+        auto result = AImageDecoder_createFromAAsset(pTextureAsset, &pTextureImgDecoder);
+        assert(result == ANDROID_IMAGE_DECODER_SUCCESS);
+        // make sure we get 8 bits per channel out. RGBA order.
+        AImageDecoder_setAndroidBitmapFormat(pTextureImgDecoder, ANDROID_BITMAP_FORMAT_RGBA_8888);
+        auto asset = loadAsset(pTextureImgDecoder, assetPath, assetType);
+        AAsset_close(pTextureAsset);
+        return asset;
+        
+    } else
+    {
+        aout << "ifstream file loading: " << std::endl;
+        auto fullPath = std::string(EXTERN_ASSET_DIR)+'/'+assetPath;
+        std::ifstream file(fullPath.c_str(), std::ios::binary);
+        assert(file);
+        file.seekg(0, std::ifstream::end);
+        int32_t fileSize = file.tellg();
+        file.seekg(0, std::ifstream::beg);
 
-    // make sure we get 8 bits per channel out. RGBA order.
-    AImageDecoder_setAndroidBitmapFormat(pAndroidDecoder, ANDROID_BITMAP_FORMAT_RGBA_8888);
-    auto asset = loadAsset(pAndroidDecoder, assetPath, assetType);
-    AAsset_close(pAndroidRobotPng);
-    return asset;
+        std::vector<char> buffer(fileSize);
+        file.read(buffer.data(), fileSize);
+        file.close();
+        auto result = AImageDecoder_createFromBuffer(buffer.data(), fileSize, &pTextureImgDecoder);
+        assert(result == ANDROID_IMAGE_DECODER_SUCCESS);
+
+        // make sure we get 8 bits per channel out. RGBA order.
+        AImageDecoder_setAndroidBitmapFormat(pTextureImgDecoder, ANDROID_BITMAP_FORMAT_RGBA_8888);
+        return loadAsset(pTextureImgDecoder, assetPath, assetType);
+    }
 }
 
 std::shared_ptr<TextureAsset>
