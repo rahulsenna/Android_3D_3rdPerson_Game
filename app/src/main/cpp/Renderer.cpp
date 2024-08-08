@@ -97,7 +97,7 @@ GLint projLoc;
 GLint nearFarLoc;
 
 float near = 0.1f;
-float far  = 1000.0f;
+float far  = 10000.0f;
 auto near_far = glm::vec2(near, far);
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
 glm::mat4 projection;
@@ -380,7 +380,7 @@ void Renderer::updateRenderArea() {
         lastX_ = width_ / 2.0f;
         lastY_ = height_ / 2.0f;
         firstMouse_ = true;
-        projection = glm::perspective(glm::radians((float)60), (float)width_ / (float)height_, 0.1f, 100.0f);
+        projection = glm::perspective(glm::radians((float)60), (float)width_ / (float)height_, near, far);
     }
 }
 
