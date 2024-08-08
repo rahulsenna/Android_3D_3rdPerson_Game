@@ -45,6 +45,12 @@ android {
             version '3.22.1'
         }
     }
+    packagingOptions {
+
+        dex {
+            useLegacyPackaging true
+        }
+    }
 }
 
 dependencies {
