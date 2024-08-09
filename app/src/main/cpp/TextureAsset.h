@@ -24,8 +24,13 @@ public:
     static std::shared_ptr<TextureAsset>
     loadAsset(const aiTexture *embeddedTexture, const std::string &assetPath, const std::string &assetType);
 
-    static std::shared_ptr<TextureAsset>
-    loadAsset(AImageDecoder *pAndroidDecoder, const std::string &assetPath, const std::string &assetType);
+    static GLuint 
+    UploadTextureToGPU(uint8_t* data, int32_t width, int32_t height);
+
+    static GLuint 
+    UploadTextureSTB_Image(uint8_t *data, size_t size);
+    static GLuint
+    UploadTextureSTB_Image(const char *filename);
 
     ~TextureAsset();
 
@@ -37,7 +42,6 @@ public:
     std::string type;
     std::string path;
 
-private:
     inline TextureAsset(GLuint textureId, const std::string &assetPath, const std::string &assetType) : 
     id(textureId), path(assetPath), type(assetType) {}
 

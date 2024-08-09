@@ -13,6 +13,8 @@
 #include "Animation.h"
 #include "Animator.h"
 
+#include <stb/stb_image.h>
+
 unordered_map<std::string, Shader*> shaders_;
 std::vector<Model> models_;
 // Animator *m_Animator;
@@ -357,6 +359,7 @@ void Renderer::initRenderer()
     glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    stbi_set_flip_vertically_on_load(0);
 
     InitGroundPlane();
     InitPhysics();

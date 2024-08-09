@@ -7,28 +7,12 @@
 #include <assert.h>
 #include "global.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
-std::shared_ptr<TextureAsset>
-TextureAsset::loadAsset(AImageDecoder *pAndroidDecoder, const std::string &assetPath, const std::string &assetType)
+GLuint 
+TextureAsset::UploadTextureToGPU(uint8_t* data, int32_t width, int32_t height)
 {
-    // Get the image header, to help set everything up
-    const AImageDecoderHeaderInfo *pAndroidHeader = nullptr;
-    pAndroidHeader = AImageDecoder_getHeaderInfo(pAndroidDecoder);
-
-    // important metrics for sending to GL
-    auto width = AImageDecoderHeaderInfo_getWidth(pAndroidHeader);
-    auto height = AImageDecoderHeaderInfo_getHeight(pAndroidHeader);
-    auto stride = AImageDecoder_getMinimumStride(pAndroidDecoder);
-
-    // Get the bitmap data of the image
-    auto upAndroidImageData = std::make_unique<std::vector<uint8_t>>(height * stride);
-    auto decodeResult = AImageDecoder_decodeImage(
-            pAndroidDecoder,
-            upAndroidImageData->data(),
-            stride,
-            upAndroidImageData->size());
-    assert(decodeResult == ANDROID_IMAGE_DECODER_SUCCESS);
-
     // Get an opengl texture
     GLuint textureId;
     glGenTextures(1, &textureId);
@@ -51,17 +35,36 @@ TextureAsset::loadAsset(AImageDecoder *pAndroidDecoder, const std::string &asset
             0, // border (always 0)
             GL_RGBA, // format
             GL_UNSIGNED_BYTE, // type
-            upAndroidImageData->data() // Data to upload
+            data // Data to upload
     );
 
     // generate mip levels. Not really needed for 2D, but good to do
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    // cleanup helpers
-    AImageDecoder_delete(pAndroidDecoder);
+    return textureId;
+}
 
-    // Create a shared pointer so it can be cleaned up easily/automatically
-    return std::shared_ptr<TextureAsset>(new TextureAsset(textureId, assetPath, assetType));
+GLuint TextureAsset::UploadTextureSTB_Image(uint8_t *data, size_t size)
+{
+    int32_t width, height, channelCount;
+    uint8_t* imageBits = stbi_load_from_memory(data, size, &width,
+                            &height, &channelCount, 4);
+    GLuint textureId = UploadTextureToGPU(imageBits, width, height);
+    stbi_image_free(imageBits);
+    return(textureId);
+}
+
+GLuint TextureAsset::UploadTextureSTB_Image(const char *filename)
+{
+    int32_t width, height, channelCount;
+    uint8_t* imageBits = stbi_load(filename, 
+                        &width,
+                        &height, 
+                        &channelCount, 
+                        4);
+    GLuint textureId = UploadTextureToGPU(imageBits, width, height);   
+    stbi_image_free(imageBits);
+    return(textureId);
 }
 
 std::shared_ptr<TextureAsset>
@@ -74,37 +77,25 @@ TextureAsset::loadAsset(AAssetManager *assetManager, const std::string &assetPat
             assetPath.c_str(),
             AASSET_MODE_BUFFER);
 
-    // Make a decoder to turn it into a texture
-    AImageDecoder *pTextureImgDecoder = nullptr;
     if (pTextureAsset)
     {
-        auto result = AImageDecoder_createFromAAsset(pTextureAsset, &pTextureImgDecoder);
-        assert(result == ANDROID_IMAGE_DECODER_SUCCESS);
-        // make sure we get 8 bits per channel out. RGBA order.
-        AImageDecoder_setAndroidBitmapFormat(pTextureImgDecoder, ANDROID_BITMAP_FORMAT_RGBA_8888);
-        auto asset = loadAsset(pTextureImgDecoder, assetPath, assetType);
+        aout << "loading file with AssetManger and decoding with stb_image.h: " << std::endl;
+        size_t fileLength = AAsset_getLength(pTextureAsset);
+        std::vector<uint8_t> buf;
+        buf.resize(fileLength);
+        int64_t readSize = AAsset_read(pTextureAsset, buf.data(), buf.size());
+        assert(readSize == buf.size());
+        auto textureId = UploadTextureSTB_Image(buf.data(), buf.size());
         AAsset_close(pTextureAsset);
-        return asset;
+        return std::shared_ptr<TextureAsset>(new TextureAsset(textureId, assetPath, assetType));
         
     } else
     {
-        aout << "ifstream file loading: " << std::endl;
+        aout << "loading file with stb_image.h: " << std::endl;
         auto fullPath = std::string(EXTERN_ASSET_DIR)+'/'+assetPath;
-        std::ifstream file(fullPath.c_str(), std::ios::binary);
-        assert(file);
-        file.seekg(0, std::ifstream::end);
-        int32_t fileSize = file.tellg();
-        file.seekg(0, std::ifstream::beg);
-
-        std::vector<char> buffer(fileSize);
-        file.read(buffer.data(), fileSize);
-        file.close();
-        auto result = AImageDecoder_createFromBuffer(buffer.data(), fileSize, &pTextureImgDecoder);
-        assert(result == ANDROID_IMAGE_DECODER_SUCCESS);
-
-        // make sure we get 8 bits per channel out. RGBA order.
-        AImageDecoder_setAndroidBitmapFormat(pTextureImgDecoder, ANDROID_BITMAP_FORMAT_RGBA_8888);
-        return loadAsset(pTextureImgDecoder, assetPath, assetType);
+        
+        auto textureId = UploadTextureSTB_Image(fullPath.c_str());
+        return std::shared_ptr<TextureAsset>(new TextureAsset(textureId, assetPath, assetType));    
     }
 }
 
@@ -112,14 +103,9 @@ std::shared_ptr<TextureAsset>
 TextureAsset::loadAsset(const aiTexture *embeddedTexture, const std::string &assetPath, const std::string &assetType) {
     aout << "Getting embeddedTexture from const aiTexture *embeddedTexture " << std::endl;
     aout << "assetPath: " << assetPath << std::endl;
-    // Get the image from asset manager
-    
-    // Make a decoder to turn it into a texture
-    AImageDecoder *pAndroidDecoder = nullptr;
-    auto result = AImageDecoder_createFromBuffer(embeddedTexture->pcData, embeddedTexture->mWidth, &pAndroidDecoder);
-    assert(result == ANDROID_IMAGE_DECODER_SUCCESS);
 
-    return loadAsset(pAndroidDecoder, assetPath, assetType);
+    auto textureId = UploadTextureSTB_Image((uint8_t *)embeddedTexture->pcData, embeddedTexture->mWidth);
+    return std::shared_ptr<TextureAsset>(new TextureAsset(textureId, assetPath, assetType));
 }
 
 TextureAsset::~TextureAsset() {
