@@ -42,6 +42,13 @@ public:
     std::string type;
     std::string path;
 
+#if ASYNC_ASSET_LOADING
+    uint8_t* buffer;
+    int32_t width;
+    int32_t height;
+    int32_t numColCh;
+#endif
+
     inline TextureAsset(GLuint textureId, const std::string &assetPath, const std::string &assetType) : 
     id(textureId), path(assetPath), type(assetType) {}
 

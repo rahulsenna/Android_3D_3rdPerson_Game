@@ -13,7 +13,12 @@
 #include "assimp_glm_helpers.h"
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
-
+std::unordered_map<std::string, aiTextureType> TextureTypes = {
+        {"texture_diffuse",  aiTextureType_DIFFUSE},
+        {"texture_specular", aiTextureType_SPECULAR},
+        {"texture_normal",   aiTextureType_NORMALS},
+        {"texture_height",   aiTextureType_HEIGHT},
+};
 
 
 // draws the model, and thus all its meshes
@@ -73,7 +78,6 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
     // data to fill
     vector<Vertex> vertices;
     vector<unsigned int> indices;
-    vector<std::shared_ptr<TextureAsset>> textures;
 
     Vertex initialized_vertex;
     SetVertexBoneDataToDefault(initialized_vertex);
@@ -111,29 +115,28 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
     }
     // process materials
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+
+    ExtractBoneWeightForVertices(vertices, mesh, scene);
+    // return a mesh object created from the extracted mesh data
+    #if ASYNC_ASSET_LOADING
+    return Mesh(vertices, indices, material);
+    #else
+
     // we assume a convention for sampler names in the shaders. Each diffuse texture should be named
     // as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER. 
     // Same applies to other texture as the following list summarizes:
     // diffuse: texture_diffuseN
     // specular: texture_specularN
     // normal: texture_normalN
+    vector<std::shared_ptr<TextureAsset>> textures;
 
-    // 1. diffuse maps
-    vector<std::shared_ptr<TextureAsset>> diffuseMaps = loadMaterialTextures(scene, material, aiTextureType_DIFFUSE, "texture_diffuse");
-    textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-    // 2. specular maps
-    vector<std::shared_ptr<TextureAsset>> specularMaps = loadMaterialTextures(scene, material, aiTextureType_SPECULAR, "texture_specular");
-    textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-    // 3. normal maps
-    std::vector<std::shared_ptr<TextureAsset>> normalMaps = loadMaterialTextures(scene, material, aiTextureType_HEIGHT, "texture_normal");
-    textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-    // 4. height maps
-    std::vector<std::shared_ptr<TextureAsset>> heightMaps = loadMaterialTextures(scene, material, aiTextureType_AMBIENT, "texture_height");
-    textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
-
-    ExtractBoneWeightForVertices(vertices, mesh, scene);
-    // return a mesh object created from the extracted mesh data
+    for (auto &[TextureTypeStr, TextureType]: TextureTypes)
+    {
+        auto tex = loadMaterialTextures(scene, material, TextureType, TextureTypeStr);
+        textures.insert(textures.end(), tex.begin(), tex.end());
+    }
     return Mesh(vertices, indices, textures);
+    #endif
 }
 void 
 Model::SetVertexBoneData(Vertex& vertex, int boneID, float weight)

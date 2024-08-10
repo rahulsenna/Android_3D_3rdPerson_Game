@@ -50,6 +50,16 @@ public:
         setupMesh();
     }
 
+#if ASYNC_ASSET_LOADING
+    aiMaterial* material;
+    Mesh(vector<Vertex> vertices, vector<unsigned int> indices, aiMaterial* material)
+    {
+        this->vertices = vertices;
+        this->indices = indices;
+        this->material = material;
+    }
+#endif
+
     // render the mesh
     void Draw(uint32_t shader)
     {
@@ -88,7 +98,6 @@ public:
         glActiveTexture(GL_TEXTURE0);
     }
 
-private:
     // render data 
     unsigned int VBO, EBO;
 

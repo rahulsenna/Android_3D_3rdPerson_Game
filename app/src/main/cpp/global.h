@@ -10,3 +10,5 @@ extern  AAssetManager *g_AssetManager;
 extern  android_app *g_App;
 
 #define EXTERN_ASSET_DIR "/sdcard/Android/obb/com.example.game"
+
+#define ASYNC_ASSET_LOADING 1

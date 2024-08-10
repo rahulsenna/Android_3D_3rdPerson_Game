@@ -107,6 +107,16 @@ glm::mat4 projection;
 #include "Physics.h"
 bool PhysXDebug = false;
 
+#include "Threading.h"
+
+std::mutex GlobalMutex;
+std::unordered_map<std::string, int> SeenTexture;
+std::unordered_map<std::string, std::shared_ptr<TextureAsset>> TextureStore;
+std::queue<TextureAsset*> ReadyToUploadQueue;
+std::deque<TextureAsset*> TextureToLoadQueue;
+void LoadSingleTextureThreaded(TextureAsset *texture);
+extern std::unordered_map<std::string, aiTextureType> TextureTypes;
+
 void Renderer::render()
 {
     // Check to see if the surface has changed size. This is _necessary_ to do every frame when
@@ -126,9 +136,18 @@ void Renderer::render()
     
     // camera/view transformation
     glm::mat4 view = camera_.GetViewMatrix();
-    
+
     for (auto &model: models_)
     {
+#if ASYNC_ASSET_LOADING
+        if (not model.AsyncInit)
+        {
+            // This has to be done on the Main Thread
+            model.AsyncInit = true;
+            for (auto &mesh: model.meshes) 
+                mesh.setupMesh();
+        }
+#endif
         model.m_Shader->use();
         if (model.m_Animator)
         {
@@ -160,6 +179,24 @@ void Renderer::render()
 //--[  Ground Plane ]----------------------------------------------------------------------
     if (PhysXDebug)
         PhysXDebugRender(view);
+
+#if ASYNC_ASSET_LOADING
+    if (not TextureToLoadQueue.empty())
+    {
+        auto work = TextureToLoadQueue.front();
+        add_task([work]() { LoadSingleTextureThreaded(work); });
+        TextureToLoadQueue.pop_front();
+    }
+
+    if (not ReadyToUploadQueue.empty())
+    {
+        auto texture = ReadyToUploadQueue.front();
+        assert(texture != nullptr);
+        texture->id = TextureAsset::UploadTextureToGPU(texture->buffer, texture->width, texture->height);
+        stbi_image_free(texture->buffer);
+        ReadyToUploadQueue.pop();
+    }
+#endif
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
@@ -227,6 +264,116 @@ void AddPhysicsStuff()
         ScenePhysX->addActor(*Box);
     }
 }
+
+#if ASYNC_ASSET_LOADING
+void LoadSingleTextureThreaded(TextureAsset *texture)
+{    
+    auto fullPath = std::string(EXTERN_ASSET_DIR) + '/' + texture->path;
+
+    
+    texture->buffer = stbi_load(fullPath.c_str(), 
+                           &texture->width,
+                           &texture->height, 
+                           &texture->numColCh, 
+                           4);
+
+
+    if(not texture->buffer)
+    {
+        aout << "FAILED IMAGE: " + texture->path  << std::endl;
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(GlobalMutex); // Lock the mutex
+    ReadyToUploadQueue.emplace(texture); 
+}
+
+
+
+
+void LoadMeshTexturesThreaded(int model_idx, int mesh_idx)
+{
+    auto &model = models_[model_idx];
+    auto &mesh = model.meshes[mesh_idx];
+
+    auto &material = mesh.material;
+    auto &textures = mesh.textures;
+
+    for (auto &[TextureTypeStr, TextureType]: TextureTypes)
+    {
+        for (unsigned int i = 0; i < material->GetTextureCount(TextureType); i++)
+        {
+            aiString str;
+            material->GetTexture(TextureType, i, &str);
+            std::string assetPath = model.directory + '/' + str.C_Str();
+            
+            std::lock_guard<std::mutex> lock(GlobalMutex); // Lock the mutex
+            
+            SeenTexture[assetPath]++;
+            
+            if (SeenTexture[assetPath] <= 1)
+            {
+                auto Text = std::make_shared<TextureAsset> (0, assetPath, TextureTypeStr);
+                TextureToLoadQueue.emplace_back(Text.get());
+                TextureStore[assetPath] = Text;
+            }
+            
+            assert(TextureStore[assetPath].get() != nullptr);
+            textures.emplace_back(TextureStore[assetPath]);
+        }
+    }
+}
+
+
+void LoadModelThreaded(
+        const char *path,
+        const char *default_anim_path = "",
+        const char *shader = "anim_model",    
+        glm::vec3 position = glm::vec3(0),          
+        float scale = 1,                          
+        glm::vec3 rotate = glm::ivec3(0)            
+)
+{
+    Model model(path, position, glm::vec3(scale), rotate);
+    model.m_Shader = shaders_[shader];
+    if (default_anim_path)
+        model.m_Animator = new Animator(new Animation(default_anim_path, &model));
+
+    int model_idx;
+    {
+        std::lock_guard<std::mutex> lock(GlobalMutex); // Lock the mutex
+        models_.emplace_back(model);
+        model_idx = models_.size()-1;
+    } // Mutex is automatically released here
+
+    for (int mesh_idx =0; mesh_idx < models_[model_idx].meshes.size(); ++mesh_idx) 
+        add_task([model_idx, mesh_idx]() { LoadMeshTexturesThreaded(model_idx, mesh_idx); });
+    
+} 
+#endif
+
+void LoadModel(const char *path,
+               const char *default_anim_path = "",
+               const char *shader = "anim_model",          
+               glm::vec3 position = glm::vec3(0),           
+               float scale = 1,                                 
+               glm::vec3 rotate = glm::ivec3(0)
+)
+{
+#if ASYNC_ASSET_LOADING
+      add_task([path, default_anim_path, shader, position,scale,rotate]() {
+        LoadModelThreaded(path, default_anim_path, shader, position, scale, rotate);
+    });
+#else
+    Model model(path, position, glm::vec3(scale), rotate);
+    model.m_Shader = shaders_[shader];
+    if (default_anim_path)
+        model.m_Animator = new Animator(new Animation(default_anim_path, &model));
+    models_.emplace_back(model);
+        
+#endif    
+}
+
 void AddStuff()
 {
 
@@ -235,43 +382,38 @@ void AddStuff()
     shaders_["anim_model"] = new Shader("shaders/modelAnim.vs", "shaders/model.fs");
     shaders_["model"] = new Shader("shaders/model.vs", "shaders/model.fs");
     
-    
-    Model Sophie("models/sophie/model.dae",glm::vec3(0));
-    Sophie.m_Shader = shaders_["anim_model"];
-    Sophie.m_Animator = new Animator(new Animation("models/sophie/anim/JogForward.dae",&Sophie));
-    models_.emplace_back(Sophie);
-    
-    Model VanGuard("models/van/model.dae", glm::vec3(-2,0,0));
-    VanGuard.m_Shader = shaders_["anim_model"];
-    VanGuard.m_Animator = new Animator(new Animation("models/van/anim/WalkingHitReaction.dae",&VanGuard));
-    models_.emplace_back(VanGuard);
+    LoadModel("models/sophie/model.dae",
+             "models/sophie/anim/JogForward.dae",
+             "anim_model");
 
-    Model Aris("models/arisa/model.dae", glm::vec3(-4,0,0));
-    Aris.m_Shader = shaders_["anim_model"];
-    Aris.m_Animator = new Animator(new Animation("models/arisa/anim/StandingRunForward.dae",&Aris));
-    models_.emplace_back(Aris);
-    
-    Model Maria("models/maria/model.dae", glm::vec3(2,0,0));
-    Maria.m_Shader = shaders_["anim_model"];
-    Maria.m_Animator = new Animator(new Animation("models/maria/anim/SwordFightOne.dae",&Maria));
-    models_.emplace_back(Maria);
+    LoadModel("models/van/model.dae",
+             "models/van/anim/WalkingHitReaction.dae",
+             "anim_model",
+             glm::vec3(-2, 0, 0));
+
+    LoadModel("models/arisa/model.dae",
+             "models/arisa/anim/StandingRunForward.dae",
+             "anim_model",
+             glm::vec3(-4,0,0));
+
+    LoadModel("models/maria/model.dae",
+             "models/maria/anim/SwordFightOne.dae",
+             "anim_model",
+             glm::vec3(2,0,0));
 
     //-------[ Houses ]------------------------------------
-    Model House1("models/HOUSES/house-home-1/source/model.fbx", glm::vec3(-40,0,-100), glm::vec3(.01));
-    House1.m_Shader = shaders_["model"];
-    models_.emplace_back(House1);
+    LoadModel("models/HOUSES/morden_wood_cabin/scene.gltf",
+             0,
+             "model",
+             glm::vec3(-4,0,-100), 
+             .01);
+    
 
-    Model House2("models/HOUSES/morden_wood_cabin/scene.gltf", glm::vec3(-4,0,-100), glm::vec3(.01));
-    House2.m_Shader = shaders_["model"];
-    models_.emplace_back(House2);
-    
-    /*
-    Model Raptor("models/raptor.glb", glm::vec3(4,0,0), glm::vec3(.01));
-    Raptor.m_Shader = shaders_["model"];
-    Raptor.m_Animator = new Animator(new Animation("models/raptor.glb",&Raptor));
-    models_.emplace_back(Raptor); 
-    */
-    
+    LoadModel("models/HOUSES/house-home-1/source/model.fbx",
+             0,
+             "model",
+             glm::vec3(-40,0,-100), 
+             .01);
 
 
 }
@@ -360,6 +502,9 @@ void Renderer::initRenderer()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     stbi_set_flip_vertically_on_load(0);
+    const auto processor_count = std::thread::hardware_concurrency();
+    aout << "[ processor_count ]: " << processor_count  << std::endl;
+    init_thread_pool(processor_count);
 
     InitGroundPlane();
     InitPhysics();

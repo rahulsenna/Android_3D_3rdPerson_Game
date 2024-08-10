@@ -30,7 +30,9 @@ public:
     glm::vec3 m_Rotate = glm::ivec3(0);
     Animator *m_Animator = 0;
     Shader *m_Shader;
-
+#if ASYNC_ASSET_LOADING
+    bool AsyncInit = false;
+#endif
     int m_BoneCounter = 0;
 
     auto& GetBoneInfoMap() { return m_BoneInfoMap; }
@@ -69,7 +71,6 @@ public:
     void Draw(uint32_t shader);
     
     
-private:
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
     void loadModel(std::string const &path);
 
