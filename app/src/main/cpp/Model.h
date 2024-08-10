@@ -28,6 +28,7 @@ public:
     glm::vec3 m_Position = glm::vec3(0);
     glm::vec3 m_Scale = glm::vec3(1);
     glm::vec3 m_Rotate = glm::ivec3(0);
+    glm::mat4 m_Transform = glm::mat4(1);
     Animator *m_Animator = 0;
     Shader *m_Shader;
 #if ASYNC_ASSET_LOADING
@@ -64,6 +65,8 @@ public:
                                     m_Scale(scale),
                                     m_Rotate(rotate)
     {
+        m_Transform = glm::translate(m_Transform, m_Position);
+        m_Transform = glm::scale(m_Transform, m_Scale);
         loadModel(path);
     }
 

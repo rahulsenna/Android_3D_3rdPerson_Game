@@ -162,12 +162,9 @@ void Renderer::render()
         }
         
         
-        auto transform = glm::translate(glm::mat4(1.f), model.m_Position);
-        transform =  glm::scale(transform, model.m_Scale);
-        // transform =  glm::rotate(transform, model.m_Rotation);;
         model.m_Shader->setMat4("projection", projection);
         model.m_Shader->setMat4("view", view);
-        model.m_Shader->setMat4("model", transform);
+        model.m_Shader->setMat4("model", model.m_Transform);
         model.Draw(model.m_Shader->program_);
         
     }
@@ -204,6 +201,8 @@ void Renderer::render()
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
     assert(swapResult == EGL_TRUE);
+    // std::chrono::duration<float, std::milli> frameTIME = std::chrono::high_resolution_clock::now() - currentFrameTime;
+    // aout << "frameTIME: " << frameTIME.count()  << std::endl;
 }
 
 #include "Content.h"
@@ -503,6 +502,8 @@ void Renderer::initRenderer()
     glEnable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 
     stbi_set_flip_vertically_on_load(0);
     const auto processor_count = std::thread::hardware_concurrency();
