@@ -109,6 +109,9 @@ bool PhysXDebug = false;
 
 #include "Threading.h"
 
+std::mutex ModelMutex;
+std::mutex ReadyToUploaMutex;
+std::mutex TextureToLoadMutex;
 std::mutex GlobalMutex;
 std::unordered_map<std::string, int> SeenTexture;
 std::unordered_map<std::string, std::shared_ptr<TextureAsset>> TextureStore;
@@ -284,7 +287,7 @@ void LoadSingleTextureThreaded(TextureAsset *texture)
         return;
     }
 
-    std::lock_guard<std::mutex> lock(GlobalMutex); // Lock the mutex
+    std::lock_guard<std::mutex> lock(ReadyToUploaMutex); // Lock the mutex
     ReadyToUploadQueue.emplace(texture); 
 }
 
@@ -307,7 +310,7 @@ void LoadMeshTexturesThreaded(int model_idx, int mesh_idx)
             material->GetTexture(TextureType, i, &str);
             std::string assetPath = model.directory + '/' + str.C_Str();
             
-            std::lock_guard<std::mutex> lock(GlobalMutex); // Lock the mutex
+            std::lock_guard<std::mutex> lock(TextureToLoadMutex); // Lock the mutex
             
             SeenTexture[assetPath]++;
             
@@ -341,7 +344,7 @@ void LoadModelThreaded(
 
     int model_idx;
     {
-        std::lock_guard<std::mutex> lock(GlobalMutex); // Lock the mutex
+        std::lock_guard<std::mutex> lock(ModelMutex); // Lock the mutex
         models_.emplace_back(model);
         model_idx = models_.size()-1;
     } // Mutex is automatically released here
@@ -504,7 +507,7 @@ void Renderer::initRenderer()
     stbi_set_flip_vertically_on_load(0);
     const auto processor_count = std::thread::hardware_concurrency();
     aout << "[ processor_count ]: " << processor_count  << std::endl;
-    init_thread_pool(processor_count);
+    init_thread_pool(processor_count*2);
 
     InitGroundPlane();
     InitPhysics();
