@@ -120,6 +120,8 @@ std::deque<TextureAsset*> TextureToLoadQueue;
 void LoadSingleTextureThreaded(TextureAsset *texture);
 extern std::unordered_map<std::string, aiTextureType> TextureTypes;
 
+#include "TextRender.h"
+
 void Renderer::render()
 {
     // Check to see if the surface has changed size. This is _necessary_ to do every frame when
@@ -136,6 +138,7 @@ void Renderer::render()
 
     // clear the color buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    render_text("FPS: " + std::to_string(1.f/deltaTime), 50.f, 100.f, 1.f, 1.f,0.f,0.f);
     
     // camera/view transformation
     glm::mat4 view = camera_.GetViewMatrix();
@@ -514,6 +517,9 @@ void Renderer::initRenderer()
     InitPhysics();
     AddStuff(); // Content
     updateRenderArea();
+    init_text_render_data(width_, height_);
+    std::string font_file = std::string(EXTERN_ASSET_DIR)+"/fonts/digital_7_mono.ttf";
+    load_font(font_file, 32.0f);
 }
 
 void Renderer::updateRenderArea() {
