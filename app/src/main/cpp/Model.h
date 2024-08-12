@@ -15,7 +15,7 @@
 #include "Shader.h"
 #include "TextureAsset.h"
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 #include "BoneInfo.h"
 
@@ -24,7 +24,7 @@ class Animator;  // Forward declaration of class Animator
 class Model 
 {
 public:
-    std::map<string, BoneInfo> m_BoneInfoMap; //
+    std::unordered_map<string, BoneInfo> m_BoneInfoMap; //
     glm::vec3 m_Position = glm::vec3(0);
     glm::vec3 m_Scale = glm::vec3(1);
     glm::vec3 m_Rotate = glm::ivec3(0);

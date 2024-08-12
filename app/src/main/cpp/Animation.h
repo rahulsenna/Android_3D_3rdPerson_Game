@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <glm/glm.hpp>
 #include <assimp/scene.h>
 #include "Bone.h"
@@ -32,7 +32,7 @@ public:
 
 	
 	
-    std::map<std::string, BoneInfo> m_BoneInfoMap;
+    std::unordered_map<std::string, BoneInfo> m_BoneInfoMap;
 	float m_Duration;
 	int m_TicksPerSecond;
 	std::vector<Bone> m_Bones;

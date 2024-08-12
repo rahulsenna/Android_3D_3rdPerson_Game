@@ -125,7 +125,7 @@ void Renderer::render()
     // Check to see if the surface has changed size. This is _necessary_ to do every frame when
     // using immersive mode as you'll get no other notification that your renderable area has
     // changed.
-    updateRenderArea();
+    // updateRenderArea();
     auto currentFrameTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> duration = currentFrameTime - lastFrameTime;
     deltaTime = duration.count();
@@ -513,6 +513,7 @@ void Renderer::initRenderer()
     InitGroundPlane();
     InitPhysics();
     AddStuff(); // Content
+    updateRenderArea();
 }
 
 void Renderer::updateRenderArea() {
