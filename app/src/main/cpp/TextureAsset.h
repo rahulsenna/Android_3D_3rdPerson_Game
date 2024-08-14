@@ -9,6 +9,9 @@
 #include <vector>
 #include "assimp/texture.h"
 
+GLuint UploadTextureToGPU(uint8_t* data, int32_t width, int32_t height);
+GLuint UploadTextureSTB_Image(uint8_t *data, size_t size);
+GLuint UploadTextureSTB_Image(const char *filename);
 
 class TextureAsset {
 public:
@@ -23,14 +26,6 @@ public:
 
     static std::shared_ptr<TextureAsset>
     loadAsset(const aiTexture *embeddedTexture, const std::string &assetPath, const std::string &assetType);
-
-    static GLuint 
-    UploadTextureToGPU(uint8_t* data, int32_t width, int32_t height);
-
-    static GLuint 
-    UploadTextureSTB_Image(uint8_t *data, size_t size);
-    static GLuint
-    UploadTextureSTB_Image(const char *filename);
 
     ~TextureAsset();
 

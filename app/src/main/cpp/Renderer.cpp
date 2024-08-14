@@ -185,6 +185,8 @@ void Renderer::render()
     if (PhysXDebug)
         PhysXDebugRender(view);
 
+    PhysXRender(view);
+
 #if ASYNC_ASSET_LOADING
     if (not TextureToLoadQueue.empty())
     {
@@ -197,7 +199,7 @@ void Renderer::render()
     {
         auto texture = ReadyToUploadQueue.front();
         assert(texture != nullptr);
-        texture->id = TextureAsset::UploadTextureToGPU(texture->buffer, texture->width, texture->height);
+        texture->id = UploadTextureToGPU(texture->buffer, texture->width, texture->height);
         stbi_image_free(texture->buffer);
         ReadyToUploadQueue.pop();
     }
@@ -259,27 +261,9 @@ void AddPhysicsStuff()
                                                 *DefaultMaterialPhysX);
     ScenePhysX->addActor(*groundPlane);
 
-    for (int i = 0; i < 100; ++i)
-    {
-        float r = (float)rand()/ (float)RAND_MAX;
-        float s = (float)rand()/ (float)RAND_MAX;
-        float t = (float)rand()/ (float)RAND_MAX;
-        
-        PxRigidDynamic *Ball = PxCreateDynamic(*PhysXSDK,
-                                               PxTransform(PxVec3(r*2,r*100.f,r*11)),
-                                               PxSphereGeometry(s),
-                                               *DefaultMaterialPhysX, 100.0f);
-
-        Ball->setAngularDamping(r*2);
-        Ball->setLinearVelocity(PxVec3(0));
-        ScenePhysX->addActor(*Ball);
-
-        PxRigidDynamic *Box = PxCreateDynamic(*PhysXSDK,
-                                              PxTransform(PxVec3(r*2,s*10.f,t*11)),
-                                              PxBoxGeometry(r*2, s*2, t*2),
-                                              *DefaultMaterialPhysX, 100.0f);
-        ScenePhysX->addActor(*Box);
-    }
+       physx::PxReal     stackZ = -20.0f;
+    for (physx::PxU32 i      = 0; i < 4; i++)
+        createStack(physx::PxTransform(physx::PxVec3(-20, 0, stackZ -= 10.0f)), 10, 2.0f);
 }
 
 #if ASYNC_ASSET_LOADING
@@ -613,6 +597,11 @@ void Renderer::handleInput()
                             MoveForward = true;
                         aout << " MoveForward = true; ";
                     }
+
+                    createDynamic(physx::PxTransform(
+                                physx::PxVec3(camera_.Position.x, camera_.Position.y, camera_.Position.z)), 
+                                physx::PxSphereGeometry(2),
+                                physx::PxVec3(camera_.Front.x, camera_.Front.y, camera_.Front.z) * 50.0f);
                         
                     break;
                 }

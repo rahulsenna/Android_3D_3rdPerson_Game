@@ -11,7 +11,7 @@
 #include <stb/stb_image.h>
 
 GLuint 
-TextureAsset::UploadTextureToGPU(uint8_t* data, int32_t width, int32_t height)
+UploadTextureToGPU(uint8_t* data, int32_t width, int32_t height)
 {
     // Get an opengl texture
     GLuint textureId;
@@ -44,7 +44,7 @@ TextureAsset::UploadTextureToGPU(uint8_t* data, int32_t width, int32_t height)
     return textureId;
 }
 
-GLuint TextureAsset::UploadTextureSTB_Image(uint8_t *data, size_t size)
+GLuint UploadTextureSTB_Image(uint8_t *data, size_t size)
 {
     int32_t width, height, channelCount;
     uint8_t* imageBits = stbi_load_from_memory(data, size, &width,
@@ -54,7 +54,7 @@ GLuint TextureAsset::UploadTextureSTB_Image(uint8_t *data, size_t size)
     return(textureId);
 }
 
-GLuint TextureAsset::UploadTextureSTB_Image(const char *filename)
+GLuint UploadTextureSTB_Image(const char *filename)
 {
     int32_t width, height, channelCount;
     uint8_t* imageBits = stbi_load(filename, 

@@ -25,6 +25,7 @@ add_library(game SHARED
         AndroidOut.cpp
         Animation.cpp
         Animator.cpp
+        BasicGeometryMesh.cpp
         Bone.cpp
         Camera.cpp
         main.cpp
