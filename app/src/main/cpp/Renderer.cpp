@@ -121,6 +121,9 @@ void LoadSingleTextureThreaded(TextureAsset *texture);
 extern std::unordered_map<std::string, aiTextureType> TextureTypes;
 
 #include "TextRender.h"
+int frame_counter = 0;
+std::string fps_str = "";
+auto lastFPStime =  std::chrono::high_resolution_clock::now();
 
 void Renderer::render()
 {
@@ -138,7 +141,6 @@ void Renderer::render()
 
     // clear the color buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    render_text("FPS: " + std::to_string(1.f/deltaTime), 50.f, 100.f, 1.f, 1.f,0.f,0.f);
     
     // camera/view transformation
     glm::mat4 view = camera_.GetViewMatrix();
@@ -200,6 +202,16 @@ void Renderer::render()
         ReadyToUploadQueue.pop();
     }
 #endif
+    auto thisFPStime =  std::chrono::high_resolution_clock::now();
+    frame_counter++;
+    std::chrono::duration<float> dt = thisFPStime - lastFPStime;
+    if (dt.count() >= 1.0)
+    {
+        lastFPStime = thisFPStime; 
+        fps_str = "FPS: " + std::to_string(frame_counter);
+        frame_counter = 0;
+    }
+    render_text(fps_str, 50.f, 100.f, 1.f, 1.f,0.f,0.f);
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
