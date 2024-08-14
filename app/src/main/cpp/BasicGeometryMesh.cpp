@@ -344,6 +344,11 @@ void GLMeshData::createTrapezoid(float baseWidth, float topWidth, float height, 
 const GLsizei MAX_INSTANCES = 1000; // Or whatever maximum number of instances you expect
 void GLMeshData::createGLObjects()
 {
+	// create vertex array
+	glGenVertexArrays(1, &meshVAO);
+	glBindVertexArray(meshVAO);
+	CHECK_GL;
+
 	// create vertex buffer objects for pos, uv
 	glGenBuffers(1, &meshVBO_pos);
 	glBindBuffer(GL_ARRAY_BUFFER, meshVBO_pos);
@@ -372,10 +377,6 @@ void GLMeshData::createGLObjects()
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	CHECK_GL;
 
-	// create vertex array
-	glGenVertexArrays(1, &meshVAO);
-	glBindVertexArray(meshVAO);
-	CHECK_GL;
 
 	GLuint loc_pos = 0;
 	GLuint loc_uv = 1;

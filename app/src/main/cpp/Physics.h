@@ -107,7 +107,8 @@ GLuint MatrixID;
 GLuint TextureID;
 GLuint texture_crate   = -1;
 GLuint texture_checker = -1;
-
+const int num_ball_textures = 15;
+GLuint    texIds[num_ball_textures]; // 15 ball
 
 void InitPhysics()
 {
@@ -172,6 +173,13 @@ void InitPhysics()
 
     texture_crate = UploadTextureSTB_Image(fullPath.c_str());
 
+    for (int i = 0; i < num_ball_textures; ++i)
+    {
+        auto num = std::string(2 - std::to_string(i + 1).length(), '0') + std::to_string(i + 1);
+        fullPath = std::string(EXTERN_ASSET_DIR)+"/textures/pool/pool_"+num+".ppm";
+        texIds[i] = UploadTextureSTB_Image(fullPath.c_str());
+    }
+
 }
 
 void StepPhysics(float dt)
@@ -216,13 +224,10 @@ void PhysXRender(glm::mat4 &View)
 {
     GeomShader->use();
     
-    
-#if 1
     physx::PxShape    *shapes[MAX_NUM_ACTOR_SHAPES];
     for (physx::PxU32 i = 0; i < static_cast<physx::PxU32>(physx_actors.size()); i++)
     {
         const physx::PxU32 nbShapes = physx_actors[i].actorPtr->getNbShapes();
-        std::cout << "nbShapes: " << nbShapes << '\n';
         PX_ASSERT(nbShapes <= MAX_NUM_ACTOR_SHAPES);
         physx_actors[i].actorPtr->getShapes(shapes, nbShapes);
 
@@ -245,14 +250,13 @@ void PhysXRender(glm::mat4 &View)
                 myBox.render();
             } else if (h.getType() == physx::PxGeometryType::eSPHERE)
             {
-                // glActiveTexture(GL_TEXTURE0);
-                // glBindTexture(GL_TEXTURE_2D, texIds[physx_actors[i].actorId % 15]);
-                // glUniform1i(TextureID, 0);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, texIds[physx_actors[i].actorId % 15]);
+                glUniform1i(TextureID, 0);
 
                 glUniformMatrix4fv(MatrixID, 1, GL_FALSE, glm::value_ptr(mvp_mat));
                 mySphere.render();
             }
         }
     }
-#endif
 }
