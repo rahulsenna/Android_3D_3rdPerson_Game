@@ -136,7 +136,6 @@ void Renderer::render()
     deltaTime = duration.count();
     lastFrameTime = currentFrameTime;
 
-    StepPhysics(deltaTime);
     
 
     // clear the color buffer
@@ -253,18 +252,6 @@ void InitGroundPlane()
 }
 
 
-void AddPhysicsStuff()
-{
-        PxRigidStatic *groundPlane = PxCreateStatic(*PhysXSDK, 
-                                                PxTransform(PxVec3(0)),
-                                                PxBoxGeometry(500.f, 0.001, 500.f),
-                                                *DefaultMaterialPhysX);
-    ScenePhysX->addActor(*groundPlane);
-
-       physx::PxReal     stackZ = -20.0f;
-    for (physx::PxU32 i      = 0; i < 4; i++)
-        createStack(physx::PxTransform(physx::PxVec3(-20, 0, stackZ -= 10.0f)), 10, 2.0f);
-}
 
 #if ASYNC_ASSET_LOADING
 void LoadSingleTextureThreaded(TextureAsset *texture)
@@ -378,7 +365,6 @@ void LoadModel(const char *path,
 void AddStuff()
 {
 
-    AddPhysicsStuff();
 
     shaders_["anim_model"] = new Shader("shaders/modelAnim.vs", "shaders/model.fs");
     shaders_["model"] = new Shader("shaders/model.vs", "shaders/model.fs");
@@ -510,7 +496,10 @@ void Renderer::initRenderer()
     init_thread_pool(processor_count*2);
 
     InitGroundPlane();
-    InitPhysics();
+    InitPhysicsRenderData();
+    std::thread PhysicsOnSaperateTherad(PhysXThreaded);
+    PhysicsOnSaperateTherad.detach();
+
     AddStuff(); // Content
     updateRenderArea();
     init_text_render_data(width_, height_);
@@ -598,10 +587,7 @@ void Renderer::handleInput()
                         aout << " MoveForward = true; ";
                     }
 
-                    createDynamic(physx::PxTransform(
-                                physx::PxVec3(camera_.Position.x, camera_.Position.y, camera_.Position.z)), 
-                                physx::PxSphereGeometry(2),
-                                physx::PxVec3(camera_.Front.x, camera_.Front.y, camera_.Front.z) * 50.0f);
+                    Shoot = true;
                         
                     break;
                 }

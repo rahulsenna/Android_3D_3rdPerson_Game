@@ -79,6 +79,7 @@ void render_text(std::string textStr, float x, float y, float scale, float r, fl
     glBindVertexArray(TextVAO);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, font.texture);
 
     GLuint indices[] = {0, 1, 2, 0, 2, 3};

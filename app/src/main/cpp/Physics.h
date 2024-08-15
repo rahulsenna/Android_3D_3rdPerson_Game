@@ -103,12 +103,18 @@ void createStack(const physx::PxTransform &t, physx::PxU32 size, physx::PxReal h
 GLMeshData myBox;
 GLMeshData mySphere;
 Shader *GeomShader;
-GLuint MatrixID;
-GLuint TextureID;
+Shader *GeomShaderInstanced;
+Shader *GeomShaderInstacedWithMultiTexture;
+GLuint uMVP_BasicGeom;
+GLuint uTextureBasicGeom;
 GLuint texture_crate   = -1;
 GLuint texture_checker = -1;
 const int num_ball_textures = 15;
 GLuint    texIds[num_ball_textures]; // 15 ball
+
+GLuint uViewProjInstancedGeom;
+GLuint uTextureInstancedGeom;
+GLuint uViewProjInstancedMultiTex;
 
 void InitPhysics()
 {
@@ -157,18 +163,26 @@ void InitPhysics()
     }
 
     DefaultMaterialPhysX = PhysXSDK->createMaterial(0.5f, 0.5f, 0.6f);
-    
+}
 
+void InitPhysicsRenderData()
+{
     PhysXShader = Shader("shaders/simple.vs", "shaders/simple.fs");
     PhysXShader.use();
     glGenVertexArrays(1, &PhysXVAO);
 
     GeomShader = new Shader("shaders/BasicGeom.vs", "shaders/BasicGeom.fs");
-    GeomShader->use();
+    GeomShaderInstanced = new Shader("shaders/BasicGeomInstance.vs", "shaders/BasicGeom.fs");
+    GeomShaderInstacedWithMultiTexture = new Shader("shaders/BasicGeomInstance.vs", "shaders/BasicGeomMultiTexture.fs");
+
     myBox.createBox(4.0f, 4.0f, 4.0f);
     mySphere.createSphere(2.0f, 32, 32);
-    MatrixID = glGetUniformLocation(GeomShader->program_, "MVP");
-    TextureID = glGetUniformLocation(GeomShader->program_, "myTextureSampler");
+    uMVP_BasicGeom = glGetUniformLocation(GeomShader->program_, "MVP");
+    uTextureBasicGeom = glGetUniformLocation(GeomShader->program_, "myTextureSampler");
+    uViewProjInstancedGeom = glGetUniformLocation(GeomShaderInstanced->program_, "VP");
+    uViewProjInstancedMultiTex = glGetUniformLocation(GeomShaderInstacedWithMultiTexture->program_, "VP");
+    uTextureInstancedGeom = glGetUniformLocation(GeomShaderInstanced->program_, "myTextureSampler");
+    
     auto fullPath = std::string(EXTERN_ASSET_DIR)+"/textures/crate.bmp";
 
     texture_crate = UploadTextureSTB_Image(fullPath.c_str());
@@ -188,6 +202,130 @@ void StepPhysics(float dt)
     // ScenePhysX->simulate(dt);
     ScenePhysX->fetchResults(true);
 }
+
+float mAccumulator = 0.0f;
+float mStepSize = 1.0f / 60.0f;
+void *PhysxScratchBuffer = malloc(1024*16*10000); // has to be multiple of 16k
+
+bool advance(float dt)
+{
+    mAccumulator  += dt;
+    if(mAccumulator < mStepSize)
+        return false;
+
+    mAccumulator -= mStepSize;
+
+    ScenePhysX->simulate(mStepSize, 0, PhysxScratchBuffer);
+    ScenePhysX->fetchResults(true);
+    return true;
+}
+
+
+
+void AddPhysicsStuff()
+{
+        PxRigidStatic *groundPlane = PxCreateStatic(*PhysXSDK, 
+                                                PxTransform(PxVec3(0)),
+                                                PxBoxGeometry(500.f, 0.001, 500.f),
+                                                *DefaultMaterialPhysX);
+    ScenePhysX->addActor(*groundPlane);
+
+       physx::PxReal     stackZ = -20.0f;
+    for (physx::PxU32 i      = 0; i < 4; i++)
+        createStack(physx::PxTransform(physx::PxVec3(-20, 0, stackZ -= 10.0f)), 10, 2.0f);
+}
+
+std::vector<glm::mat4> BoxInstances;
+std::vector<glm::mat4> SphereInstances;
+std::vector<GLuint> SphereTextures;
+bool Shoot = false;
+
+#include <thread>
+
+void PhysXThreaded()
+{
+    const int MAX_NUM_ACTOR_SHAPES = 128;
+    aout << "PhysX Thread: " << std::this_thread::get_id() << std::endl;
+    BoxInstances.reserve(1000);
+    SphereInstances.reserve(1000);
+    SphereTextures.reserve(1000);
+
+    std::vector<glm::mat4> BakBufferBoxInstances;
+    std::vector<glm::mat4> BakBufferSphereInstances;
+    std::vector<GLuint> BakBufferSphereTextures;
+
+    BakBufferBoxInstances.reserve(1000);
+    BakBufferSphereInstances.reserve(1000);
+    BakBufferSphereTextures.reserve(1000);
+    InitPhysics();
+    AddPhysicsStuff();
+
+    float dt = 1.f/60.f;
+    auto LastTime = std::chrono::high_resolution_clock::now();
+    int frame_cnt = 0;
+    while(1)
+    {
+        auto ThisTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> Duration = ThisTime - LastTime;
+        LastTime = ThisTime;
+        dt = Duration.count();
+
+        // StepPhysics(dt);
+        if (not advance(dt))
+        {
+            int timeRemaining = 16 - (int)(dt *1000.f);
+            std::this_thread::sleep_for(std::chrono::milliseconds(timeRemaining));
+            continue;
+        }
+        
+        BakBufferBoxInstances.clear();
+        BakBufferSphereInstances.clear();
+        BakBufferSphereTextures.clear();
+
+        physx::PxShape *shapes[MAX_NUM_ACTOR_SHAPES];
+
+        for (physx::PxU32 i = 0; i < static_cast<physx::PxU32>(physx_actors.size()); i++)
+        {
+            const physx::PxU32 nbShapes = physx_actors[i].actorPtr->getNbShapes();
+            PX_ASSERT(nbShapes <= MAX_NUM_ACTOR_SHAPES);
+            physx_actors[i].actorPtr->getShapes(shapes, nbShapes);
+
+            for (physx::PxU32 j = 0; j < nbShapes; j++)
+            {
+                const physx::PxMat44 shapePose(physx::PxShapeExt::getGlobalPose(*shapes[j], *physx_actors[i].actorPtr));
+                glm::mat4 model_matrix = glm::make_mat4(&shapePose.column0.x);
+
+                if (shapes[j]->getGeometry().getType() == physx::PxGeometryType::eBOX)
+                {
+                    BakBufferBoxInstances.push_back(model_matrix);
+                }
+                else if (shapes[j]->getGeometry().getType() == physx::PxGeometryType::eSPHERE)
+                {
+                    BakBufferSphereInstances.push_back(model_matrix);
+                    BakBufferSphereTextures.push_back(texIds[physx_actors[i].actorId % 15]);
+                }
+            }
+        }
+        BoxInstances.assign(BakBufferBoxInstances.begin(), BakBufferBoxInstances.end());
+        SphereInstances.assign(BakBufferSphereInstances.begin(), BakBufferSphereInstances.end());
+        SphereTextures.assign(BakBufferSphereTextures.begin(), BakBufferSphereTextures.end());
+
+        
+
+        if (Shoot)
+        {
+            Shoot = false;
+            createDynamic(
+                physx::PxTransform(
+                physx::PxVec3(camera_.Position.x, camera_.Position.y, camera_.Position.z)), 
+                physx::PxSphereGeometry(2),
+                physx::PxVec3(camera_.Front.x, camera_.Front.y, camera_.Front.z) * 50.0f);
+        }
+        
+
+    }
+}
+
 void PhysXDebugRender(glm::mat4 &View)
 {
     PhysXShader.use();
@@ -222,41 +360,35 @@ void PhysXDebugRender(glm::mat4 &View)
 const int MAX_NUM_ACTOR_SHAPES = 128;
 void PhysXRender(glm::mat4 &View)
 {
-    GeomShader->use();
+
+    glm::mat4 vp_mat = projection * View;
     
-    physx::PxShape    *shapes[MAX_NUM_ACTOR_SHAPES];
-    for (physx::PxU32 i = 0; i < static_cast<physx::PxU32>(physx_actors.size()); i++)
+    if (not BoxInstances.empty())
     {
-        const physx::PxU32 nbShapes = physx_actors[i].actorPtr->getNbShapes();
-        PX_ASSERT(nbShapes <= MAX_NUM_ACTOR_SHAPES);
-        physx_actors[i].actorPtr->getShapes(shapes, nbShapes);
+        GeomShaderInstanced->use();
 
-        for (physx::PxU32 j = 0; j < nbShapes; j++)
-        {
-            const physx::PxMat44          shapePose(physx::PxShapeExt::getGlobalPose(*shapes[j], *physx_actors[i].actorPtr));
-            const physx::PxGeometryHolder h = shapes[j]->getGeometry();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture_crate);
+        glUniform1i(uTextureInstancedGeom, 0);
 
-            // render object
-            glm::mat4 model_matrix = glm::make_mat4(&shapePose.column0.x);
-            glm::mat4 mvp_mat      = projection * View * model_matrix;
-
-            if (h.getType() == physx::PxGeometryType::eBOX)
-            {
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, texture_crate);
-                glUniform1i(TextureID, 0);
-
-                glUniformMatrix4fv(MatrixID, 1, GL_FALSE, glm::value_ptr(mvp_mat));
-                myBox.render();
-            } else if (h.getType() == physx::PxGeometryType::eSPHERE)
-            {
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, texIds[physx_actors[i].actorId % 15]);
-                glUniform1i(TextureID, 0);
-
-                glUniformMatrix4fv(MatrixID, 1, GL_FALSE, glm::value_ptr(mvp_mat));
-                mySphere.render();
-            }
-        }
+        glUniformMatrix4fv(uViewProjInstancedGeom, 1, GL_FALSE, glm::value_ptr(vp_mat));
+        myBox.renderInstanced(BoxInstances);
     }
+
+    // Render spheres
+    if (not SphereInstances.empty())
+    {
+        GeomShaderInstacedWithMultiTexture->use();
+        for (int i = 0; i < num_ball_textures ; ++i)
+        {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, texIds[i]);
+            std::string uniformName = "myTextureSampler[" + std::to_string(i) + "]";
+
+            GLint texLoc = glGetUniformLocation(GeomShaderInstacedWithMultiTexture->program_, uniformName.c_str());
+            glUniform1i(texLoc, i);
+        }
+        glUniformMatrix4fv(uViewProjInstancedMultiTex, 1, GL_FALSE, glm::value_ptr(vp_mat));
+        mySphere.renderInstanced(SphereInstances);
+    };
 }
