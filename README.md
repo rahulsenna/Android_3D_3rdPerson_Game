@@ -11,7 +11,7 @@
 - [License](#license)
 
 ## Screenshot
-![ScreenShot1.jpg](docs%2FScreenhots%2FAsyncLoadingDemo.gif)
+![ScreenShot1.jpg](docs%2FScreenhots%2FStackAndBallsDemo.gif)
 
 ## Prerequisites
 

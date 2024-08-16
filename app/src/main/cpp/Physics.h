@@ -116,6 +116,11 @@ GLuint uViewProjInstancedGeom;
 GLuint uTextureInstancedGeom;
 GLuint uViewProjInstancedMultiTex;
 
+Shader *GeomShaderAtlas;
+GLuint uViewProjnstancedAtlas;
+GLuint uAtlasTexture;
+GLuint TextureAtlasPoolBalls;
+
 void InitPhysics()
 {
 
@@ -182,17 +187,17 @@ void InitPhysicsRenderData()
     uViewProjInstancedGeom = glGetUniformLocation(GeomShaderInstanced->program_, "VP");
     uViewProjInstancedMultiTex = glGetUniformLocation(GeomShaderInstacedWithMultiTexture->program_, "VP");
     uTextureInstancedGeom = glGetUniformLocation(GeomShaderInstanced->program_, "myTextureSampler");
+
+    GeomShaderAtlas = new Shader("shaders/BasicGeomInstance.vs", "shaders/atlas.fs");
+    uViewProjnstancedAtlas = glGetUniformLocation(GeomShaderAtlas->program_, "VP");
+    uAtlasTexture = glGetUniformLocation(GeomShaderAtlas->program_, "atlasTexture");
     
     auto fullPath = std::string(EXTERN_ASSET_DIR)+"/textures/crate.bmp";
 
     texture_crate = UploadTextureSTB_Image(fullPath.c_str());
 
-    for (int i = 0; i < num_ball_textures; ++i)
-    {
-        auto num = std::string(2 - std::to_string(i + 1).length(), '0') + std::to_string(i + 1);
-        fullPath = std::string(EXTERN_ASSET_DIR)+"/textures/pool/pool_"+num+".ppm";
-        texIds[i] = UploadTextureSTB_Image(fullPath.c_str());
-    }
+    fullPath = std::string(EXTERN_ASSET_DIR)+"/textures/pool_ball_atlas.png";
+    TextureAtlasPoolBalls =  UploadTextureSTB_Image(fullPath.c_str());
 
 }
 
@@ -378,17 +383,12 @@ void PhysXRender(glm::mat4 &View)
     // Render spheres
     if (not SphereInstances.empty())
     {
-        GeomShaderInstacedWithMultiTexture->use();
-        for (int i = 0; i < num_ball_textures ; ++i)
-        {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, texIds[i]);
-            std::string uniformName = "myTextureSampler[" + std::to_string(i) + "]";
-
-            GLint texLoc = glGetUniformLocation(GeomShaderInstacedWithMultiTexture->program_, uniformName.c_str());
-            glUniform1i(texLoc, i);
-        }
-        glUniformMatrix4fv(uViewProjInstancedMultiTex, 1, GL_FALSE, glm::value_ptr(vp_mat));
+        GeomShaderAtlas->use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, TextureAtlasPoolBalls);
+        glUniform1i(uAtlasTexture, 0);
+            
+        glUniformMatrix4fv(uViewProjnstancedAtlas, 1, GL_FALSE, glm::value_ptr(vp_mat));
         mySphere.renderInstanced(SphereInstances);
     };
 }
