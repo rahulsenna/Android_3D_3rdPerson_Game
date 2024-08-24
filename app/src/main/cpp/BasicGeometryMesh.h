@@ -23,9 +23,11 @@ struct GLMeshData
 	void createCone(float radius, float height, uint32_t segments);
     void createCylinder(float radius, float height, uint32_t segments);
     void createTrapezoid(float baseWidth, float topWidth, float height, float depth);
+    void createQuad();
 
 	void renderInstanced(const std::vector<glm::mat4>& modelMatrices);
 	void render();
+    void renderQuad();
 	void clear();
 
 

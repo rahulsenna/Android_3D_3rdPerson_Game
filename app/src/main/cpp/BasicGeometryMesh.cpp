@@ -340,6 +340,28 @@ void GLMeshData::createTrapezoid(float baseWidth, float topWidth, float height, 
     createGLObjects();
 }
 
+void GLMeshData::createQuad()
+{
+    float quadVertices[] = {
+        // positions   // texture coords
+         0.0f,  1.0f,  0.0f, 1.0f,
+         1.0f,  1.0f,  1.0f, 1.0f,
+         0.0f,  0.0f,  0.0f, 0.0f,
+         1.0f,  0.0f,  1.0f, 0.0f
+    };
+
+    glGenVertexArrays(1, &meshVAO);
+    glGenBuffers(1, &meshVBO_pos);
+    glBindVertexArray(meshVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, meshVBO_pos);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
 
 const GLsizei MAX_INSTANCES = 1000; // Or whatever maximum number of instances you expect
 void GLMeshData::createGLObjects()
@@ -443,4 +465,16 @@ void GLMeshData::renderInstanced(const std::vector<glm::mat4>& modelMatrices)
     glBindVertexArray(meshVAO);
     glDrawElementsInstanced(GL_TRIANGLES, indexData.size(), GL_UNSIGNED_INT, 0, modelMatrices.size());
     glBindVertexArray(0);
+}
+
+void GLMeshData::renderQuad()
+{
+	glBindVertexArray(meshVAO);
+	CHECK_GL;
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	CHECK_GL;
+
+	glBindVertexArray(0);
+	CHECK_GL;
 }
