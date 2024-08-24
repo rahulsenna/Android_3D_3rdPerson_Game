@@ -7,7 +7,7 @@ project("Android_3D_3rdPerson_Game")
 
 # Creates your game shared library. The name must be the same as the
 # one used for loading in your Kotlin/Java or AndroidManifest.txt files.
-add_definitions(-DNDEBUG)
+add_definitions(-D_DEBUG)
 
 include(FetchContent)
 set(FETCHCONTENT_BASE_DIR ${PROJECT_SOURCE_DIR}/libs CACHE PATH "Missing description." FORCE)

@@ -75,6 +75,7 @@ Renderer::~Renderer() {
 }
 
 glm::mat4 projection;
+glm::mat4 OrthoProjection;
 
 #include "Physics.h"
 bool PhysXDebug = false;
@@ -158,7 +159,138 @@ void InitGroundPlane()
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
 }
 
+//--[ UI Setup ]----------------------------------------------------------------------
 
+
+
+inline bool
+RectIntersect(glm::vec4 &dim, float x, float y)
+{
+    bool result = x >= dim.x && x <= (dim.z+dim.x) && y >= dim.y && y <= (dim.w +dim.y);
+    return result;
+}
+
+GLMeshData UiQuad;
+inline glm::mat4 GetQuadMatrix(float x, float y, float width, float height)
+{
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(x, y, 0.0f));
+    model = glm::scale(model, glm::vec3(width, height, 1.0f));
+
+    return OrthoProjection*model;
+}
+
+inline glm::mat4 GetQuadMatrix(glm::vec4 &dim)
+{
+    return GetQuadMatrix(dim.x,dim.y, dim.z,dim.q);
+}
+float WidthF, HeightF;
+float Width001, Height001;
+GLuint ShootBtnImg;
+glm::mat4 ShootBtnMat;
+glm::vec4 ShootBtnPos;
+
+struct ui
+{
+    GLuint IMG;
+    bool Active = false;
+    glm::mat4 Mat;
+    glm::vec4 Pos;
+
+    // ui(GLuint img, glm::vec4 pos)
+    // {   IMG = img;
+    //     Pos = pos;
+    //     Mat = GetQuadMatrix(Pos);
+    // }
+    
+};
+struct buttons
+{
+    enum btn
+    {
+        Shoot         = 0x0,
+        OrbitCamera,
+        Count
+    };
+
+    ui   UIs[Count]    = {};
+    bool Hold[Count]   = {};
+    bool Tapped[Count] = {};
+};
+
+
+
+buttons Buttons;
+Shader *UI_Shader;
+GLuint uMVP_UI;
+GLuint uTextureUI;
+GLuint uOpacityUI;
+
+inline void UiInit()
+{
+
+    UiQuad.createQuad();
+    UI_Shader = new Shader("shaders/UI_Quad.vs", "shaders/UI_Quad.fs");
+    uMVP_UI    = glGetUniformLocation(UI_Shader->program_, "uMVP");
+    uTextureUI = glGetUniformLocation(UI_Shader->program_, "uTextureUI");
+    uOpacityUI = glGetUniformLocation(UI_Shader->program_, "uOpacityUI");
+
+    Buttons.UIs[buttons::Shoot] = { 
+        .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/shoot_btn.png")),
+        .Pos = {WidthF - (25.f*Width001), HeightF - (25.f*Height001), Width001 *20.f, Height001*20.f}};
+
+    Buttons.UIs[buttons::OrbitCamera] = { 
+        .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/exclaim_btn.png")),
+        .Pos = {(2.f*Width001), (50.f*Height001), Width001 *10.f, Height001*10.f}};
+    
+    for (int i = 0; i < buttons::Count; ++i)
+    {
+        Buttons.UIs[i].Mat = GetQuadMatrix(Buttons.UIs[i].Pos);
+    }
+
+}
+inline void RenderSingleUI(ui &UI)
+{
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, UI.IMG);
+    
+    if (UI.Active)
+    {
+        glUniform1f(uOpacityUI, 1.f);
+    } else
+    {
+        glUniform1f(uOpacityUI, 0.5f);
+    }
+    glUniformMatrix4fv(uMVP_UI, 1, GL_FALSE, glm::value_ptr(UI.Mat));
+    UiQuad.renderQuad();
+}
+
+inline void RenderUI()
+{
+    if (Buttons.Tapped[buttons::OrbitCamera])
+    {
+        Buttons.UIs[buttons::OrbitCamera].Active = not Buttons.UIs[buttons::OrbitCamera].Active;
+        Buttons.Tapped[buttons::OrbitCamera] = false;
+    }
+    if (Buttons.Hold[buttons::Shoot])
+    {
+        // Shoot = true;
+        Buttons.UIs[buttons::Shoot].Active = true;
+    } else
+    {
+        Buttons.UIs[buttons::Shoot].Active = false;
+        // Shoot = false;
+    }
+
+
+    UI_Shader->use();
+    for (int i = 0; i < buttons::Count; ++i)
+    {
+        RenderSingleUI(Buttons.UIs[i]);	 
+    }
+
+}
+//--[ UI Setup ]----------------------------------------------------------------------
 
 #if ASYNC_ASSET_LOADING
 void LoadSingleTextureThreaded(TextureAsset *texture)
@@ -412,6 +544,8 @@ void Renderer::initRenderer()
     init_text_render_data(width_, height_);
     std::string font_file = std::string(EXTERN_ASSET_DIR)+"/fonts/digital_7_mono.ttf";
     load_font(font_file, 32.0f);
+
+    UiInit();
 }
 
 void Renderer::updateRenderArea() {
@@ -432,11 +566,19 @@ void Renderer::updateRenderArea() {
         lastY_ = height_ / 2.0f;
         firstMouse_ = true;
         projection = glm::perspective(glm::radians((float)60), (float)width_ / (float)height_, near, far);
+        OrthoProjection = glm::ortho(0.0f, (float)width_, (float)height_, 0.0f, -1.0f, 1.0f);
+        auto AspectRatio = (float)height_/(float)width_;
+        WidthF = (float)width_;
+        HeightF = (float)height_;
+
+        Width001  = (float)width_ * 0.01f * AspectRatio;
+        Height001 = (float)height_* 0.01f;
     }
 }
 
 bool MoveForward = false;
 bool MoveBackward = false;
+int Holds[10] = {-1};
 
 void Renderer::handleInput()
 {
@@ -477,6 +619,109 @@ void Renderer::handleInput()
             auto y = GameActivityPointerAxes_getY(&pointer);
             // get the x and y position of this event if it is not ACTION_MOVE.        
             // determine the action type and process the event accordingly.
+
+            auto ActionState = action & AMOTION_EVENT_ACTION_MASK;
+
+            if (ActionState == AMOTION_EVENT_ACTION_MOVE)
+            {
+                
+                if (x>width_/3) // right side pad
+                {
+                    if (firstMouse_)
+                    {
+                        lastX_ = x;
+                        lastY_ = y;
+                        firstMouse_ = false;
+                    }
+
+                    float xoffset = x - lastX_;
+                    float yoffset = lastY_ - y; // reversed since y-coordinates go from bottom to top
+
+                    lastX_ = x;
+                    lastY_ = y;
+
+                    camera_.ProcessMouseMovement(xoffset, yoffset);                        
+                } else
+                {
+                    if (y>height_- height_/10)
+                    {
+                        MoveBackward = true;
+                        MoveForward = false;
+                    }
+                    else
+                    {
+                        MoveForward = true;
+                        MoveBackward = false;   
+                    }
+                }
+                
+                aout <<  "(" << pointer.id << ", " << x << ", " << y << ") Pointer Move ";
+            }
+
+            if (actionPtrIdx != ptr_idx)
+            { 
+            	continue;
+            }
+
+            auto UpAction = ActionState == AMOTION_EVENT_ACTION_UP || 
+                            ActionState == AMOTION_EVENT_ACTION_POINTER_UP ||
+                            ActionState == AMOTION_EVENT_ACTION_CANCEL;
+
+            if (UpAction)
+            {
+                if ( x>width_/3) // right side pad
+                    firstMouse_ = true;
+                    
+                if (x<width_/3) // left side pad
+                {
+                    MoveForward = false;
+                    MoveBackward = false;                    
+                }
+
+                aout << "(" << pointer.id << ", " << x << ", " << y << ") Pointer Up ";
+                if (Holds[ptr_idx] != -1)
+                { 
+                    Buttons.Hold[Holds[ptr_idx]] = false;
+                    Holds[ptr_idx] = -1;
+                }
+                continue;
+            }
+
+            auto DownAction = ActionState == AMOTION_EVENT_ACTION_DOWN || 
+                            ActionState == AMOTION_EVENT_ACTION_POINTER_DOWN;
+            {
+                for (int i = 0; i < buttons::Count; ++i)
+                {
+                    if (RectIntersect(Buttons.UIs[i].Pos, x,y))
+                    {
+                        Buttons.Hold[i] = true;
+                        Buttons.Tapped[i] = DownAction;
+                        Holds[ptr_idx] = i;
+                        if (i == buttons::Shoot)
+                        {
+                            Shoot = true;
+                        }
+                    }	
+                }    
+            }
+            
+
+
+            
+
+            if (DownAction)
+            {
+                aout << "(" << pointer.id << ", " << x << ", " << y << ") Pointer Down ";
+                
+                if (x < width_/3)
+                {
+                    if (y>height_- height_/10)
+                        MoveBackward = true;
+                    else
+                        MoveForward = true;
+                }
+            }
+#if  0
             switch (action & AMOTION_EVENT_ACTION_MASK)
             {
                 case AMOTION_EVENT_ACTION_DOWN:
@@ -552,7 +797,8 @@ void Renderer::handleInput()
                     }
                     
                     aout << "(" << pointer.id << ", " << x << ", " << y << ") "
-                         << "Pointer Down";
+                         << "Pointer Move";
+#if  0
                 
                     // There is no pointer index for ACTION_MOVE, only a snapshot of
                     // all active pointers; app needs to cache previous active pointers
@@ -568,11 +814,13 @@ void Renderer::handleInput()
                         aout << " ";
                     }
                     aout << "Pointer Move";
+#endif  //0
                     break;
                 }
                 default:
                     aout << "Unknown MotionEvent Action: " << action;     
             }
+#endif
             }
         aout << std::endl;
     }
@@ -665,6 +913,8 @@ void Renderer::render()
         PhysXDebugRender(view);
 
     PhysXRender(view);
+
+    RenderUI();
 
 #if ASYNC_ASSET_LOADING
     if (not TextureToLoadQueue.empty())

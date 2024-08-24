@@ -192,12 +192,8 @@ void InitPhysicsRenderData()
     uViewProjnstancedAtlas = glGetUniformLocation(GeomShaderAtlas->program_, "VP");
     uAtlasTexture = glGetUniformLocation(GeomShaderAtlas->program_, "atlasTexture");
     
-    auto fullPath = std::string(EXTERN_ASSET_DIR)+"/textures/crate.bmp";
-
-    texture_crate = UploadTextureSTB_Image(fullPath.c_str());
-
-    fullPath = std::string(EXTERN_ASSET_DIR)+"/textures/pool_ball_atlas.png";
-    TextureAtlasPoolBalls =  UploadTextureSTB_Image(fullPath.c_str());
+    texture_crate = UploadTextureSTB_Image(FULL_PATH("textures/crate.bmp"));
+    TextureAtlasPoolBalls =  UploadTextureSTB_Image(FULL_PATH("textures/pool_ball_atlas.png"));
 
 }
 
