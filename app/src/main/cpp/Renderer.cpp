@@ -15,6 +15,11 @@
 
 #include <stb/stb_image.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <chrono>
+
 unordered_map<std::string, Shader*> shaders_;
 std::vector<Model> models_;
 // Animator *m_Animator;
@@ -53,8 +58,6 @@ aout << std::endl;\
 #define CORNFLOWER_BLUE 100 / 255.f, 149 / 255.f, 237 / 255.f, 1
 
 
-
-
 Renderer::~Renderer() {
     if (display_ != EGL_NO_DISPLAY) {
         eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -71,13 +74,35 @@ Renderer::~Renderer() {
     }
 }
 
+glm::mat4 projection;
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
+#include "Physics.h"
+bool PhysXDebug = false;
+
+#include "Threading.h"
+
+std::mutex ModelMutex;
+std::mutex ReadyToUploaMutex;
+std::mutex TextureToLoadMutex;
+std::mutex GlobalMutex;
+std::unordered_map<std::string, int> SeenTexture;
+std::unordered_map<std::string, std::shared_ptr<TextureAsset>> TextureStore;
+std::queue<TextureAsset*> ReadyToUploadQueue;
+std::deque<TextureAsset*> TextureToLoadQueue;
+void LoadSingleTextureThreaded(TextureAsset *texture);
+extern std::unordered_map<std::string, aiTextureType> TextureTypes;
+
+#include "TextRender.h"
+int frame_counter = 0;
+std::string fps_str = "";
+auto lastFPStime =  std::chrono::high_resolution_clock::now();
+
+
+
+
+
 float deltaTime = 0.0f;
 auto lastFrameTime =  std::chrono::high_resolution_clock::now();
-#include <chrono>
 
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
 GLfloat planeVertices[] = {
@@ -102,124 +127,6 @@ float near = 0.1f;
 float far  = 10000.0f;
 auto near_far = glm::vec2(near, far);
 //--[ Ground Plane Setup ]----------------------------------------------------------------------
-glm::mat4 projection;
-
-#include "Physics.h"
-bool PhysXDebug = false;
-
-#include "Threading.h"
-
-std::mutex ModelMutex;
-std::mutex ReadyToUploaMutex;
-std::mutex TextureToLoadMutex;
-std::mutex GlobalMutex;
-std::unordered_map<std::string, int> SeenTexture;
-std::unordered_map<std::string, std::shared_ptr<TextureAsset>> TextureStore;
-std::queue<TextureAsset*> ReadyToUploadQueue;
-std::deque<TextureAsset*> TextureToLoadQueue;
-void LoadSingleTextureThreaded(TextureAsset *texture);
-extern std::unordered_map<std::string, aiTextureType> TextureTypes;
-
-#include "TextRender.h"
-int frame_counter = 0;
-std::string fps_str = "";
-auto lastFPStime =  std::chrono::high_resolution_clock::now();
-
-void Renderer::render()
-{
-    // Check to see if the surface has changed size. This is _necessary_ to do every frame when
-    // using immersive mode as you'll get no other notification that your renderable area has
-    // changed.
-    // updateRenderArea();
-    auto currentFrameTime = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<float> duration = currentFrameTime - lastFrameTime;
-    deltaTime = duration.count();
-    lastFrameTime = currentFrameTime;
-
-    
-
-    // clear the color buffer
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    // camera/view transformation
-    glm::mat4 view = camera_.GetViewMatrix();
-
-    for (auto &model: models_)
-    {
-#if ASYNC_ASSET_LOADING
-        if (not model.AsyncInit)
-        {
-            // This has to be done on the Main Thread
-            model.AsyncInit = true;
-            for (auto &mesh: model.meshes) 
-                mesh.setupMesh();
-        }
-#endif
-        model.m_Shader->use();
-        if (model.m_Animator)
-        {
-            model.m_Animator->UpdateAnimation(deltaTime);
-            for (int i = 0; i < model.m_Animator->m_FinalBoneMatrices.size(); ++i)
-            {
-		        model.m_Shader->setMat4("finalBonesMatrices[" + std::to_string(i) + "]", model.m_Animator->m_FinalBoneMatrices[i]);    
-            }
-        }
-        
-        
-        model.m_Shader->setMat4("projection", projection);
-        model.m_Shader->setMat4("view", view);
-        model.m_Shader->setMat4("model", model.m_Transform);
-        model.Draw(model.m_Shader->program_);
-        
-    }
-
-//--[ Ground Plane ]----------------------------------------------------------------------
-    GroundPlane.use();
-    glUniform1fv(nearFarLoc, 2, glm::value_ptr(near_far));
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(camera_.GetViewMatrix()));
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-    glBindVertexArray(planeVAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-//--[  Ground Plane ]----------------------------------------------------------------------
-    if (PhysXDebug)
-        PhysXDebugRender(view);
-
-    PhysXRender(view);
-
-#if ASYNC_ASSET_LOADING
-    if (not TextureToLoadQueue.empty())
-    {
-        auto work = TextureToLoadQueue.front();
-        add_task([work]() { LoadSingleTextureThreaded(work); });
-        TextureToLoadQueue.pop_front();
-    }
-
-    if (not ReadyToUploadQueue.empty())
-    {
-        auto texture = ReadyToUploadQueue.front();
-        assert(texture != nullptr);
-        texture->id = UploadTextureToGPU(texture->buffer, texture->width, texture->height);
-        stbi_image_free(texture->buffer);
-        ReadyToUploadQueue.pop();
-    }
-#endif
-    auto thisFPStime =  std::chrono::high_resolution_clock::now();
-    frame_counter++;
-    std::chrono::duration<float> dt = thisFPStime - lastFPStime;
-    if (dt.count() >= 1.0)
-    {
-        lastFPStime = thisFPStime; 
-        fps_str = "FPS: " + std::to_string(frame_counter);
-        frame_counter = 0;
-    }
-    render_text(fps_str, 50.f, 100.f, 1.f, 1.f,0.f,0.f);
-
-    // Present the rendered image. This is an implicit glFlush.
-    auto swapResult = eglSwapBuffers(display_, surface_);
-    assert(swapResult == EGL_TRUE);
-    // std::chrono::duration<float, std::milli> frameTIME = std::chrono::high_resolution_clock::now() - currentFrameTime;
-    // aout << "frameTIME: " << frameTIME.count()  << std::endl;
-}
 
 #include "Content.h"
 
@@ -696,4 +603,100 @@ void Renderer::handleInput()
     }
     // clear the key input count too.
     android_app_clear_key_events(inputBuffer);
+}
+
+void Renderer::render()
+{
+    // Check to see if the surface has changed size. This is _necessary_ to do every frame when
+    // using immersive mode as you'll get no other notification that your renderable area has
+    // changed.
+    // updateRenderArea();
+    auto currentFrameTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> duration = currentFrameTime - lastFrameTime;
+    deltaTime = duration.count();
+    lastFrameTime = currentFrameTime;
+
+    
+
+    // clear the color buffer
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    // camera/view transformation
+    glm::mat4 view = camera_.GetViewMatrix();
+
+    for (auto &model: models_)
+    {
+#if ASYNC_ASSET_LOADING
+        if (not model.AsyncInit)
+        {
+            // This has to be done on the Main Thread
+            model.AsyncInit = true;
+            for (auto &mesh: model.meshes) 
+                mesh.setupMesh();
+        }
+#endif
+        model.m_Shader->use();
+        if (model.m_Animator)
+        {
+            model.m_Animator->UpdateAnimation(deltaTime);
+            for (int i = 0; i < model.m_Animator->m_FinalBoneMatrices.size(); ++i)
+            {
+		        model.m_Shader->setMat4("finalBonesMatrices[" + std::to_string(i) + "]", model.m_Animator->m_FinalBoneMatrices[i]);    
+            }
+        }
+        
+        
+        model.m_Shader->setMat4("projection", projection);
+        model.m_Shader->setMat4("view", view);
+        model.m_Shader->setMat4("model", model.m_Transform);
+        model.Draw(model.m_Shader->program_);
+        
+    }
+
+//--[ Ground Plane ]----------------------------------------------------------------------
+    GroundPlane.use();
+    glUniform1fv(nearFarLoc, 2, glm::value_ptr(near_far));
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(camera_.GetViewMatrix()));
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+    glBindVertexArray(planeVAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+//--[  Ground Plane ]----------------------------------------------------------------------
+    if (PhysXDebug)
+        PhysXDebugRender(view);
+
+    PhysXRender(view);
+
+#if ASYNC_ASSET_LOADING
+    if (not TextureToLoadQueue.empty())
+    {
+        auto work = TextureToLoadQueue.front();
+        add_task([work]() { LoadSingleTextureThreaded(work); });
+        TextureToLoadQueue.pop_front();
+    }
+
+    if (not ReadyToUploadQueue.empty())
+    {
+        auto texture = ReadyToUploadQueue.front();
+        assert(texture != nullptr);
+        texture->id = UploadTextureToGPU(texture->buffer, texture->width, texture->height);
+        stbi_image_free(texture->buffer);
+        ReadyToUploadQueue.pop();
+    }
+#endif
+    auto thisFPStime =  std::chrono::high_resolution_clock::now();
+    frame_counter++;
+    std::chrono::duration<float> dt = thisFPStime - lastFPStime;
+    if (dt.count() >= 1.0)
+    {
+        lastFPStime = thisFPStime; 
+        fps_str = "FPS: " + std::to_string(frame_counter);
+        frame_counter = 0;
+    }
+    render_text(fps_str, 50.f, 100.f, 1.f, 1.f,0.f,0.f);
+
+    // Present the rendered image. This is an implicit glFlush.
+    auto swapResult = eglSwapBuffers(display_, surface_);
+    assert(swapResult == EGL_TRUE);
+    // std::chrono::duration<float, std::milli> frameTIME = std::chrono::high_resolution_clock::now() - currentFrameTime;
+    // aout << "frameTIME: " << frameTIME.count()  << std::endl;
 }
