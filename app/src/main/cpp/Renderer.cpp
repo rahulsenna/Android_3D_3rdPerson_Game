@@ -237,7 +237,7 @@ inline void UiInit()
 
     Buttons.UIs[buttons::Shoot] = { 
         .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/shoot_btn.png")),
-        .Pos = {WidthF - (25.f*Width001), HeightF - (25.f*Height001), Width001 *20.f, Height001*20.f}};
+        .Pos = {WidthF - (25.f*Width001), HeightF - (50.f*Height001), Width001 *20.f, Height001*20.f}};
 
     Buttons.UIs[buttons::OrbitCamera] = { 
         .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/exclaim_btn.png")),
