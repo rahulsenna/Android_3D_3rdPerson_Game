@@ -85,18 +85,20 @@ void render_text(std::string textStr, float x, float y, float scale, float r, fl
     GLuint indices[] = {0, 1, 2, 0, 2, 3};
 
     const char *text = textStr.c_str();
+    float start_x = x;  // Store the initial x position
 
     while (*text) {
         if (*text >= 32 && *text < 128)
         {
             stbtt_aligned_quad q;
-            stbtt_GetBakedQuad(font.cdata, font.w, font.h, *text - 32, &x, &y, &q, 1);
+            float char_x = 0, char_y = 0; // Start at 0 for each character
+            stbtt_GetBakedQuad(font.cdata, font.w, font.h, *text - 32, &char_x, &char_y, &q, 1);
 
             float vertices[4][4] = {
-                { q.x0 * scale, q.y0 * scale, q.s0, q.t0 },
-                { q.x0 * scale, q.y1 * scale, q.s0, q.t1 },
-                { q.x1 * scale, q.y1 * scale, q.s1, q.t1 },
-                { q.x1 * scale, q.y0 * scale, q.s1, q.t0 }
+                { start_x + q.x0 * scale, y + q.y0 * scale, q.s0, q.t0 },
+                { start_x + q.x0 * scale, y + q.y1 * scale, q.s0, q.t1 },
+                { start_x + q.x1 * scale, y + q.y1 * scale, q.s1, q.t1 },
+                { start_x + q.x1 * scale, y + q.y0 * scale, q.s1, q.t0 }
             };
 
             glBindBuffer(GL_ARRAY_BUFFER, TextVBO);
@@ -105,6 +107,8 @@ void render_text(std::string textStr, float x, float y, float scale, float r, fl
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, indices);
 
             glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+            start_x += char_x * scale; // Update the x offset for the next character
         }
         ++text;
     }
