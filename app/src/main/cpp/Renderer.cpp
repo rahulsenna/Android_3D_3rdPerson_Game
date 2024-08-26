@@ -30,7 +30,7 @@ float lastX_=0, lastY_=0;
 Camera camera_ = glm::vec3(0,3,5);
 
 
-
+#define FONT_HEIGHT 32.0f
 
 //! executes glGetString and outputs the result to logcat
 #define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
@@ -166,7 +166,8 @@ void InitGroundPlane()
 inline bool
 RectIntersect(glm::vec4 &dim, float x, float y)
 {
-    bool result = x >= dim.x && x <= (dim.z+dim.x) && y >= dim.y && y <= (dim.w +dim.y);
+    float error = 40.f;
+    bool result = (x+error) >= dim.x && (x-error) <= (dim.z+dim.x) && (y+error) >= dim.y && (y-error) <= (dim.w +dim.y);
     return result;
 }
 
@@ -186,6 +187,7 @@ inline glm::mat4 GetQuadMatrix(glm::vec4 &dim)
 }
 float WidthF, HeightF;
 float Width001, Height001;
+float Width001Aspcet;
 GLuint ShootBtnImg;
 glm::mat4 ShootBtnMat;
 glm::vec4 ShootBtnPos;
@@ -196,6 +198,8 @@ struct ui
     bool Active = false;
     glm::mat4 Mat;
     glm::vec4 Pos;
+    char Label[10] = {0};
+    glm::vec3 LabelPos;
 
     // ui(GLuint img, glm::vec4 pos)
     // {   IMG = img;
@@ -208,8 +212,14 @@ struct buttons
 {
     enum btn
     {
-        Shoot         = 0x0,
-        OrbitCamera,
+        OrbitCamera= 0x0,
+        Shoot,
+        JumpBtn,
+        D_Up,
+        D_Down,
+        D_Left,
+        D_Right,
+        RunBtn,
         Count
     };
 
@@ -237,15 +247,48 @@ inline void UiInit()
 
     Buttons.UIs[buttons::Shoot] = { 
         .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/shoot_btn.png")),
-        .Pos = {WidthF - (25.f*Width001), HeightF - (50.f*Height001), Width001 *20.f, Height001*20.f}};
+        .Pos = {(89.f*Width001), 50.f*Height001, Width001Aspcet *20.f, Height001*20.f}};
 
     Buttons.UIs[buttons::OrbitCamera] = { 
         .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/exclaim_btn.png")),
-        .Pos = {(2.f*Width001), (50.f*Height001), Width001 *10.f, Height001*10.f}};
+        .Pos = {(2.f*Width001), (50.f*Height001), Width001Aspcet *10.f, Height001*10.f}};
+
+    Buttons.UIs[buttons::JumpBtn] = { 
+        .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/red_circle.png")),
+        .Pos = {(85.f*Width001), (75.f*Height001), Width001Aspcet *15.f, Height001*15.f},
+        .Label = "Jump"};
+
+    Buttons.UIs[buttons::RunBtn] = { 
+        .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/run_icon.png")),
+        .Pos = {(7.f*Width001), 58.f*Height001, Width001Aspcet *10.f, Height001*10.f}};
+
+    Buttons.UIs[buttons::D_Up] = { 
+        .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/up_arrow2.png")),
+        .Pos = {(7.f*Width001), 70.f*Height001, Width001Aspcet *10.f, Height001*10.f}};
+
+    Buttons.UIs[buttons::D_Down] = { 
+        .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/down_arrow2.png")),
+        .Pos = {(7.f*Width001), 84.f*Height001, Width001Aspcet *10.f, Height001*10.f}};
+
+    Buttons.UIs[buttons::D_Left] = { 
+        .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/left_arrow2.png")),
+        .Pos = {(3.f*Width001), 77.f*Height001, Width001Aspcet *10.f, Height001*10.f}};
+
+    Buttons.UIs[buttons::D_Right] = { 
+        .IMG =  UploadTextureSTB_Image(FULL_PATH("textures/ui/right_arrow2.png")),
+        .Pos = {(10.9f*Width001), 77.f*Height001, Width001Aspcet *10.f, Height001*10.f}};
     
-    for (int i = 0; i < buttons::Count; ++i)
+    for (int BtnIdx = 0; BtnIdx < buttons::Count; ++BtnIdx)
     {
-        Buttons.UIs[i].Mat = GetQuadMatrix(Buttons.UIs[i].Pos);
+        Buttons.UIs[BtnIdx].Mat = GetQuadMatrix(Buttons.UIs[BtnIdx].Pos);
+        if (Buttons.UIs[BtnIdx].Label[0] != 0)
+        {
+            auto &UI = Buttons.UIs[BtnIdx];
+
+            UI.LabelPos.x = UI.Pos.x + (FONT_HEIGHT*.7);
+            UI.LabelPos.y = UI.Pos.y+UI.Pos.w*.6;
+            UI.LabelPos.z = UI.Pos.w/(FONT_HEIGHT*5.f);  // Scale   
+        }
     }
 
 }
@@ -272,22 +315,34 @@ inline void RenderUI()
         Buttons.UIs[buttons::OrbitCamera].Active = not Buttons.UIs[buttons::OrbitCamera].Active;
         Buttons.Tapped[buttons::OrbitCamera] = false;
     }
-    if (Buttons.Hold[buttons::Shoot])
+    for (int BtnIdx = buttons::Shoot; BtnIdx < buttons::Count; ++BtnIdx)
     {
-        // Shoot = true;
-        Buttons.UIs[buttons::Shoot].Active = true;
-    } else
-    {
-        Buttons.UIs[buttons::Shoot].Active = false;
-        // Shoot = false;
+        Buttons.UIs[BtnIdx].Active = Buttons.Hold[BtnIdx];
     }
 
 
     UI_Shader->use();
+    // Disable depth writing for transparent objects
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     for (int i = 0; i < buttons::Count; ++i)
     {
         RenderSingleUI(Buttons.UIs[i]);	 
     }
+    glDisable(GL_BLEND);
+
+    // Render UI Text (Button Text)
+    for (int i = 0; i < buttons::Count; ++i)
+    {
+        auto &UI = Buttons.UIs[i];
+        if (UI.Label[0] != 0)
+        { 
+            render_text(UI.Label, UI.LabelPos.x, UI.LabelPos.y, UI.LabelPos.z, 1,1,1);
+        }
+    }
+    glDepthMask(GL_TRUE);
+
 
 }
 //--[ UI Setup ]----------------------------------------------------------------------
@@ -543,7 +598,7 @@ void Renderer::initRenderer()
     updateRenderArea();
     init_text_render_data(width_, height_);
     std::string font_file = std::string(EXTERN_ASSET_DIR)+"/fonts/digital_7_mono.ttf";
-    load_font(font_file, 32.0f);
+    load_font(font_file, FONT_HEIGHT);
 
     UiInit();
 }
@@ -571,14 +626,15 @@ void Renderer::updateRenderArea() {
         WidthF = (float)width_;
         HeightF = (float)height_;
 
-        Width001  = (float)width_ * 0.01f * AspectRatio;
+        Width001Aspcet = (float)width_ * 0.01f * AspectRatio;
+        Width001  = (float)width_ * 0.01f;
         Height001 = (float)height_* 0.01f;
     }
 }
 
 bool MoveForward = false;
 bool MoveBackward = false;
-int Holds[10] = {-1};
+int Holds[10] = {0};
 
 void Renderer::handleInput()
 {
@@ -692,12 +748,13 @@ void Renderer::handleInput()
             {
                 for (int i = 0; i < buttons::Count; ++i)
                 {
+                    Buttons.Hold[i] = false;
                     if (RectIntersect(Buttons.UIs[i].Pos, x,y))
                     {
                         Buttons.Hold[i] = true;
                         Buttons.Tapped[i] = DownAction;
                         Holds[ptr_idx] = i;
-                        if (i == buttons::Shoot)
+                        if (i == buttons::Shoot && DownAction)
                         {
                             Shoot = true;
                         }

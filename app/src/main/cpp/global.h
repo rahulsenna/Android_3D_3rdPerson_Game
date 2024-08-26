@@ -33,7 +33,7 @@ extern  android_app *g_App;
         } \
     } timer_instance_##name(#name);
 
-#define CHECK_GL { GLenum glStatus = glGetError(); if( glStatus != GL_NO_ERROR ) { aout << "File: " << __FILE__ << " " << "Line: " << __LINE__ << " " << "OpenGL error: " << openglGetErrorString( glStatus ) << std::endl; } }
+#define CHECK_GL { GLenum glStatus = glGetError(); if( glStatus != GL_NO_ERROR ) { aout << "File: " << __FILE__ << "(" << __LINE__ << ") " << "OpenGL error: " << openglGetErrorString( glStatus ) << std::endl; } }
 static std::string openglGetErrorString(GLenum status)
 {
 	std::stringstream ss;
